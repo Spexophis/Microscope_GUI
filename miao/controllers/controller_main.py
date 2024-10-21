@@ -443,7 +443,7 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].mode = self.con_controller.get_scmos_mode()
             if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
                 self.update_trigger_parameters("imaging")
-                line_exposure, line_interval, interval_lines = self.con_controller.get_scmos_expo()
+                _, _, interval_lines = self.con_controller.get_scmos_expo()
                 line_exposure, line_interval = self.p.trigger.update_lightsheet_rolling(interval_lines)
                 self.m.cam_set[self.cameras["imaging"]].line_exposure = line_exposure
                 self.m.cam_set[self.cameras["imaging"]].line_interval = line_interval
@@ -503,12 +503,12 @@ class MainController(QtCore.QObject):
 
     def stop_video(self, vm):
         try:
-            self.m.daq.stop_triggers()
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.lasers_off()
             if self.thread_video.isRunning():
                 self.thread_video.quit()
                 self.thread_video.wait()
+            self.m.daq.stop_triggers()
+            self.m.cam_set[self.cameras["imaging"]].stop_live()
+            self.lasers_off()
             if vm == "Dot Scan":
                 self.reset_galvo_positions()
             elif vm == "Scan Calib":

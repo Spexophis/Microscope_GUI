@@ -4,10 +4,11 @@ A ctypes based interface to Hamamatsu sCMOS Flash 4.0
 
 import ctypes
 import ctypes.util
-# import threading
-# from collections import deque
 
 import numpy as np
+
+# import threading
+# from collections import deque
 
 dcam = ctypes.windll.dcamapi
 # Hamamatsu constants.
@@ -249,6 +250,7 @@ class HamamatsuCamera(object):
     Storage for the data from the camera is allocated dynamically and
     copied out of the camera buffers.
     """
+
     class CameraSettings:
         def __init__(self):
             self.t_clean = 0
@@ -609,7 +611,7 @@ class HamamatsuCamera(object):
         """
         # Check if the property exists.
         if not (property_name in self.properties):
-            print(" unknown property name:", property_name)
+            self.logg.error(" unknown property name:", property_name)
             return False
         # If the value is text, figure out what the corresponding numerical property value is.
         if isinstance(property_value, str):
@@ -617,24 +619,24 @@ class HamamatsuCamera(object):
             if property_value in text_values:
                 property_value = float(text_values[property_value])
             else:
-                print(" unknown property text value:", property_value, "for", property_name)
+                self.logg.error(" unknown property text value:", property_value, "for", property_name)
                 return False
         # Check that the property is within range.
         [pv_min, pv_max] = self.get_property_range(property_name)
         if property_value < pv_min:
-            print(" set property value", property_value, "is less than minimum of", pv_min, property_name,
-                  "setting to minimum")
+            self.logg.error(" set property value", property_value, "is less than minimum of", pv_min, property_name,
+                            "setting to minimum")
             property_value = pv_min
         if property_value > pv_max:
-            print(" set property value", property_value, "is greater than maximum of", pv_max, property_name,
-                  "setting to maximum")
+            self.logg.error(" set property value", property_value, "is greater than maximum of", pv_max, property_name,
+                            "setting to maximum")
             property_value = pv_max
         # Set the property value, return what it was set too.
         prop_id = self.properties[property_name]
         p_value = ctypes.c_double(property_value)
-        self.check_status(dcam.dcamprop_setgetvalue(self.camera_handle, ctypes.c_int32(prop_id), ctypes.byref(p_value),
-                                                    ctypes.c_int32(DCAM_DEFAULT_ARG)), "dcamprop_setgetvalue")
-        return p_value.value
+        r = dcam.dcamprop_setgetvalue(self.camera_handle, ctypes.c_int32(prop_id), ctypes.byref(p_value),
+                                      ctypes.c_int32(DCAM_DEFAULT_ARG))
+        return r
 
     def set_subarray_mode(self):
         """
@@ -791,12 +793,37 @@ class HamamatsuCameraMR(HamamatsuCamera):
         self.logg.info(f"Max camera backlog was: {self.max_backlog}")
         self.max_backlog = 0
 
-    def set_roi(self, hbin, vbin, hstart, hend, vstart, vend):
-        self.set_property_value("subarray_hpos", hstart)
-        self.set_property_value("subarray_hsize", abs(hend - hstart + 1))
-        self.set_property_value("subarray_vpos", vstart)
-        self.set_property_value("subarray_vsize", abs(vend - vstart + 1))
-        self.set_property_value("binning", hbin)
+    def set_roi(self, hbin, vbin, hstart, hend, vstart, vend, ret=False):
+        hsize = abs(hend - hstart)
+        vsize = abs(vend - vstart)
+        if self.set_property_value("subarray_hpos", hstart) == 1:
+            self.logg.info(f"Set ROI Horizontal Start: {hstart}")
+        else:
+            self.logg.error(f"Failed to Set ROI Horizontal Start: {hstart}")
+        if self.set_property_value("subarray_hsize", hsize) == 1:
+            self.logg.info(f"Set ROI Horizontal Size: {hsize}")
+        else:
+            self.logg.error(f"Failed to Set ROI Horizontal Size: {hsize}")
+        if self.set_property_value("subarray_vpos", vstart) == 1:
+            self.logg.info(f"Set ROI Vertical Start: {vstart}")
+        else:
+            self.logg.error(f"Failed to Set ROI Vertical Start: {vstart}")
+        if self.set_property_value("subarray_vsize", vsize) == 1:
+            self.logg.info(f"Set ROI Vertical Size: {vsize}")
+        else:
+            self.logg.error(f"Failed to Set ROI Vertical Size: {vsize}")
+        if self.set_property_value("binning", hbin):
+            self.logg.info(f"Set Binning: {hbin}")
+        else:
+            self.logg.error(f"Failed to Set Binning: {hbin}")
+
+    def get_roi(self):
+        hstart = self.get_property_value("subarray_hpos")
+        hsize = self.get_property_value("subarray_hsize")
+        vstart = self.get_property_value("subarray_vpos")
+        vsize = self.get_property_value("subarray_vsize")
+        binn = self.get_property_value("binning")
+        return binn[0], hstart[0], hsize[0], vstart[0], vsize[0]
 
     def prepare_live(self):
         self.set_property_value('trigger_source', self.trigger_source)
@@ -816,7 +843,7 @@ class HamamatsuCameraMR(HamamatsuCamera):
             self.set_property_value('trigger_active', 1)
             self.set_property_value('trigger_global_exposure', 3)
             self.set_property_value('internal_line_interval', self.line_interval)
-            self.set_property_value('internal_line_interval', self.line_exposure)
+            self.set_property_value('exposure_time', self.line_exposure)
         # self.camera_thread = CameraThread(self)
 
     def start_live(self):
@@ -882,7 +909,6 @@ class HamamatsuCameraMR(HamamatsuCamera):
 
     def stop_data_acquisition(self):
         self.stop_acquisition()
-
 
 # class AcquisitionThread(threading.Thread):
 #     running = False
