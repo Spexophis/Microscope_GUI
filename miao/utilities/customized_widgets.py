@@ -437,8 +437,11 @@ class DialWidget(QtWidgets.QDial):
 
 
 class DialogWidget(QtWidgets.QDialog):
-    def __init__(self):
+    dialog_closed = QtCore.pyqtSignal()
+
+    def __init__(self, interrupt=False):
         super().__init__()
+        self.interrupt = interrupt
         self.setFixedSize(320, 64)
         self.setStyleSheet(''' 
             QDialog {
@@ -450,6 +453,15 @@ class DialogWidget(QtWidgets.QDialog):
             }
         ''')
         self.setWindowTitle("Please Wait")
+
+    def keyPressEvent(self, event):
+        if self.interrupt:
+            if event.key() == QtCore.Qt.Key_Escape:
+                self.dialog_closed.emit()
+            else:
+                event.ignore()
+        else:
+            event.ignore()
 
 
 class MessageBoxWidget(QtWidgets.QMessageBox):
@@ -491,8 +503,8 @@ def create_scroll_area(layout="Form"):
     return scroll_area, layout
 
 
-def create_dialog(labtex=False):
-    dialogue = DialogWidget()
+def create_dialog(labtex=False, interrupt=False):
+    dialogue = DialogWidget(interrupt)
     layout = QtWidgets.QVBoxLayout()
     label = LabelWidget("Task is running, please wait...")
     layout.addWidget(label)

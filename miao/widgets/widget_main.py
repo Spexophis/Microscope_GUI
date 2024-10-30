@@ -24,15 +24,14 @@ class MainWidget(QtWidgets.QMainWindow):
         self.dock_con = self.create_dock_widget(self.con_view)
         self.dock_ao = self.create_dock_widget(self.ao_view)
 
-        self.dialog, self.dialog_text = cw.create_dialog(labtex=True)
-        self.dialog.setModal(True)
-
         self.setCentralWidget(self.view_view)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dock_con)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_ao)
 
         self.dock_con.setFloating(True)
         self.dock_ao.setFloating(True)
+
+        self.dialog, self.dialog_text = None, None
 
         self.setWindowTitle("Microscope Control")
         self.setStyleSheet("background-color: #121212; color: #FFFFFF")
@@ -68,7 +67,9 @@ class MainWidget(QtWidgets.QMainWindow):
         self.ao_view.save_spinbox_values()
         super().closeEvent(event)
 
-    def get_dialog(self):
+    def get_dialog(self, interrupt=False):
+        self.dialog, self.dialog_text = cw.create_dialog(labtex=True, interrupt=interrupt)
+        self.dialog.setModal(True)
         self.dialog.show()
         self.dialog_text.setText(f"Task is running, please wait...")
         self.refresh_gui()
@@ -86,7 +87,6 @@ class MainWidget(QtWidgets.QMainWindow):
         if event.key() == QtCore.Qt.Key_Escape:
             self.Signal_interrupt.emit()
         elif event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-            print("Enter key press ignored")
             return
         else:
             super().keyPressEvent(event)

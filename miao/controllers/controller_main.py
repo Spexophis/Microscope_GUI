@@ -76,7 +76,7 @@ class MainController(QtCore.QObject):
         self.thread_wfs.finished.connect(self.wfsWorker.stop)
 
     def _set_signal_connections(self):
-        self.v.Signal_interrupt.connect(self.interrupt_loop)
+        self.v.Signal_interrupt.connect(self.interrupt_thread)
         self.sada.connect(self.save_data)
         self.sazf.connect(self.save_zernike_coeffs)
         self.sig_plt.connect(self.plot_)
@@ -178,7 +178,7 @@ class MainController(QtCore.QObject):
         self.v.dialog.close()
 
     @QtCore.pyqtSlot()
-    def interrupt_loop(self):
+    def interrupt_thread(self):
         self.loop_flag = False
 
     @QtCore.pyqtSlot()
@@ -1667,7 +1667,7 @@ class MainController(QtCore.QObject):
                         else:
                             mts = [ipr.hpf(img, hpr) for img in images]
                         self.logg.info(f"zernike mode #{mode}, ({amps}), ({mts})")
-                        self.view_controller.plot_update(data=mts, x=amps)
+                        self.sig_plt.emit(amps, mts)
                         pm = ipr.peak_find(amps, mts)
                         if isinstance(pm, str):
                             self.logg.error(f"zernike mode #{mode} " + pm)
@@ -1682,7 +1682,7 @@ class MainController(QtCore.QObject):
                             else:
                                 step_size /= 1.5
                     else:
-                        return
+                        break
             self.dfm.set_dm(cmd)
             time.sleep(0.016)
             self.m.daq.run_triggers()
@@ -1704,7 +1704,8 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_auto_sensorless(self):
-        self.v.get_dialog()
+        self.v.get_dialog(interrupt=True)
+        self.v.dialog.dialog_closed.connect(self.interrupt_thread)
         self.run_task(task=self.auto_sensorless)
 
     def prepare_shwfs_acquisition(self):
