@@ -60,13 +60,6 @@ class GroupWidget(QtWidgets.QGroupBox):
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
 
 
-def create_dock(name=''):
-    dock = DockWidget(name)
-    group = GroupWidget()
-    dock.setWidget(group)
-    return dock, group
-
-
 class FileDialogWidget(QtWidgets.QFileDialog):
     def __init__(self, name="Save File", file_filter="All Files (*)", default_dir=""):
         super().__init__()
@@ -111,19 +104,6 @@ class ScrollAreaWidget(QtWidgets.QScrollArea):
         self.setWidgetResizable(True)
         self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         self.setStyleSheet("QScrollArea {background-color: #1E1E1E; color: white;}")
-
-
-def create_scroll_area(layout="Form"):
-    scroll_area = ScrollAreaWidget()
-    content_widget = QtWidgets.QWidget(scroll_area)
-    content_widget.setStyleSheet("background-color: #1E1E1E;")
-    scroll_area.setWidget(content_widget)
-    if layout == "Form":
-        layout = QtWidgets.QFormLayout(content_widget)
-    else:
-        layout = QtWidgets.QGridLayout(content_widget)
-    content_widget.setLayout(layout)
-    return scroll_area, layout
 
 
 class FrameWidget(QtWidgets.QFrame):
@@ -472,19 +452,6 @@ class DialogWidget(QtWidgets.QDialog):
         self.setWindowTitle("Please Wait")
 
 
-def create_dialog(labtex=False):
-    dialogue = DialogWidget()
-    layout = QtWidgets.QVBoxLayout()
-    label = LabelWidget("Task is running, please wait...")
-    layout.addWidget(label)
-    dialogue.setLayout(layout)
-    dialogue.setModal(True)
-    if labtex:
-        return dialogue, label
-    else:
-        return dialogue
-
-
 class MessageBoxWidget(QtWidgets.QMessageBox):
     def __init__(self, title, message):
         super().__init__()
@@ -502,3 +469,36 @@ class MessageBoxWidget(QtWidgets.QMessageBox):
                 color: #EEEEEE;
             }
         """)
+
+
+def create_dock(name=''):
+    dock = DockWidget(name)
+    group = GroupWidget()
+    dock.setWidget(group)
+    return dock, group
+
+
+def create_scroll_area(layout="Form"):
+    scroll_area = ScrollAreaWidget()
+    content_widget = QtWidgets.QWidget(scroll_area)
+    content_widget.setStyleSheet("background-color: #1E1E1E;")
+    scroll_area.setWidget(content_widget)
+    if layout == "Form":
+        layout = QtWidgets.QFormLayout(content_widget)
+    else:
+        layout = QtWidgets.QGridLayout(content_widget)
+    content_widget.setLayout(layout)
+    return scroll_area, layout
+
+
+def create_dialog(labtex=False):
+    dialogue = DialogWidget()
+    layout = QtWidgets.QVBoxLayout()
+    label = LabelWidget("Task is running, please wait...")
+    layout.addWidget(label)
+    dialogue.setLayout(layout)
+    dialogue.setModal(True)
+    if labtex:
+        return dialogue, label
+    else:
+        return dialogue
