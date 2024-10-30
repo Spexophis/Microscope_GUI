@@ -180,9 +180,11 @@ def peak_find(x, y):
     a, b, c = np.polyfit(x, y, 2)
     p = -1 * b / a / 2.0
     if a > 0:
-        raise ValueError("no maximum")
-    elif (p >= x.max()) or (p <= x.min()):
-        raise ValueError("maximum exceeding range")
+        return "No peak"
+    elif p >= x.max():
+        return "Peak above maximum"
+    elif p <= x.min():
+        return "Peak below minimum"
     else:
         return p
 

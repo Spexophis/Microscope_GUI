@@ -9,14 +9,17 @@ class ViewController:
     def plot_sh(self, data, layer=1):
         self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_fft(self, data, layer="FFT"):
-        self.v.show_image(self.v.img_layers[4], data)
+    def plot_msk(self, data, layer=7):
+        self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_shb(self, data, layer="ShackHartmann(Base)"):
-        self.v.show_image(self.v.img_layers[5], data)
+    def plot_fft(self, data, layer=4):
+        self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_wf(self, data, layer="Wavefront"):
-        self.v.show_image(self.v.img_layers[6], data)
+    def plot_shb(self, data, layer=5):
+        self.v.show_image(self.v.img_layers[layer], data)
+
+    def plot_wf(self, data, layer=6):
+        self.v.show_image(self.v.img_layers[layer], data)
 
     def get_image_data(self, layer=1):
         return self.v.get_image(self.v.img_layers[layer])

@@ -21,6 +21,7 @@ class AOWidget(QtWidgets.QWidget):
     Signal_save_dm = QtCore.pyqtSignal()
     Signal_sensorlessAO_run = QtCore.pyqtSignal()
     Signal_sensorlessAO_save = QtCore.pyqtSignal()
+    Signal_sensorlessAO_auto = QtCore.pyqtSignal()
 
     def __init__(self, config, logg, path, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,13 +71,13 @@ class AOWidget(QtWidgets.QWidget):
     def _create_image_widgets(self):
         layout_image = QtWidgets.QHBoxLayout()
 
-        self.lcdNumber_wfmax_img = cw.lcdnumber_widget()
-        self.lcdNumber_wfmin_img = cw.lcdnumber_widget()
-        self.lcdNumber_wfrms_img = cw.lcdnumber_widget()
+        self.lcdNumber_wfmax_img = cw.LCDNumberWidget()
+        self.lcdNumber_wfmin_img = cw.LCDNumberWidget()
+        self.lcdNumber_wfrms_img = cw.LCDNumberWidget()
         self.image_shwfs_scroll_area, image_shwfs_scroll_layout = cw.create_scroll_area()
-        image_shwfs_scroll_layout.addRow(cw.label_widget(str('Wavefront MAX')), self.lcdNumber_wfmax_img)
-        image_shwfs_scroll_layout.addRow(cw.label_widget(str('Wavefront MIN')), self.lcdNumber_wfmin_img)
-        image_shwfs_scroll_layout.addRow(cw.label_widget(str('Wavefront RMS')), self.lcdNumber_wfrms_img)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MAX')), self.lcdNumber_wfmax_img)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MIN')), self.lcdNumber_wfmin_img)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront RMS')), self.lcdNumber_wfrms_img)
 
         layout_image.addWidget(self.image_shwfs_scroll_area)
         return layout_image
@@ -84,65 +85,65 @@ class AOWidget(QtWidgets.QWidget):
     def _create_parameters_widgets(self):
         layout_parameters = QtWidgets.QHBoxLayout()
 
-        self.QLabel_wfrmd_foc = cw.label_widget(str('Method'))
-        self.QComboBox_wfrmd_foc = cw.combobox_widget(list_items=['correlation', 'centerofmass'])
-        self.QSpinBox_base_xcenter_foc = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_base_ycenter_foc = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_xcenter_foc = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_ycenter_foc = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_n_lenslets_x_foc = cw.spinbox_widget(0, 64, 1, 14)
-        self.QSpinBox_n_lenslets_y_foc = cw.spinbox_widget(0, 64, 1, 14)
-        self.QSpinBox_spacing_foc = cw.spinbox_widget(0, 64, 1, 26)
-        self.QSpinBox_radius_foc = cw.spinbox_widget(0, 64, 1, 12)
-        self.QDoubleSpinBox_foc_background = cw.doublespinbox_widget(0, 1, 0.01, 2, 0.1)
+        self.QLabel_wfrmd_foc = cw.LabelWidget(str('Method'))
+        self.QComboBox_wfrmd_foc = cw.ComboBoxWidget(list_items=['correlation', 'centerofmass'])
+        self.QSpinBox_base_xcenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_base_ycenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_offset_xcenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_offset_ycenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_n_lenslets_x_foc = cw.SpinBoxWidget(0, 64, 1, 14)
+        self.QSpinBox_n_lenslets_y_foc = cw.SpinBoxWidget(0, 64, 1, 14)
+        self.QSpinBox_spacing_foc = cw.SpinBoxWidget(0, 64, 1, 26)
+        self.QSpinBox_radius_foc = cw.SpinBoxWidget(0, 64, 1, 12)
+        self.QDoubleSpinBox_foc_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
         self.confocal_shwfs_parameters_scroll_area, confocal_shwfs_parameters_scroll_layout = cw.create_scroll_area()
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Illumination')))
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.frame_widget())
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Method')), self.QComboBox_wfrmd_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('X_center (Base)')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Illumination')))
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Method')), self.QComboBox_wfrmd_foc)
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Base)')),
                                                        self.QSpinBox_base_xcenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Y_center (Base)')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Base)')),
                                                        self.QSpinBox_base_ycenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('X_center (Offset)')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Offset)')),
                                                        self.QSpinBox_offset_xcenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Y_center (Offset)')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Offset)')),
                                                        self.QSpinBox_offset_ycenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Lenslet X')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet X')),
                                                        self.QSpinBox_n_lenslets_x_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Lenslet Y')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet Y')),
                                                        self.QSpinBox_n_lenslets_y_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Spacing')), self.QSpinBox_spacing_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Radius')), self.QSpinBox_radius_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Background')),
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Spacing')), self.QSpinBox_spacing_foc)
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Radius')), self.QSpinBox_radius_foc)
+        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
                                                        self.QDoubleSpinBox_foc_background)
 
-        self.QComboBox_wfrmd_img = cw.combobox_widget(list_items=['correlation', 'centerofmass'])
-        self.QSpinBox_base_xcenter_img = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_base_ycenter_img = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_xcenter_img = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_ycenter_img = cw.spinbox_widget(0, 2048, 1, 1024)
-        self.QSpinBox_n_lenslets_x_img = cw.spinbox_widget(0, 64, 1, 14)
-        self.QSpinBox_n_lenslets_y_img = cw.spinbox_widget(0, 64, 1, 14)
-        self.QSpinBox_spacing_img = cw.spinbox_widget(0, 64, 1, 26)
-        self.QSpinBox_radius_img = cw.spinbox_widget(0, 64, 1, 12)
-        self.QDoubleSpinBox_img_background = cw.doublespinbox_widget(0, 1, 0.01, 2, 0.1)
+        self.QComboBox_wfrmd_img = cw.ComboBoxWidget(list_items=['correlation', 'centerofmass'])
+        self.QSpinBox_base_xcenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_base_ycenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_offset_xcenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_offset_ycenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
+        self.QSpinBox_n_lenslets_x_img = cw.SpinBoxWidget(0, 64, 1, 14)
+        self.QSpinBox_n_lenslets_y_img = cw.SpinBoxWidget(0, 64, 1, 14)
+        self.QSpinBox_spacing_img = cw.SpinBoxWidget(0, 64, 1, 26)
+        self.QSpinBox_radius_img = cw.SpinBoxWidget(0, 64, 1, 12)
+        self.QDoubleSpinBox_img_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
         self.image_shwfs_parameters_scroll_area, image_shwfs_parameters_scroll_layout = cw.create_scroll_area()
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Imaging')))
-        image_shwfs_parameters_scroll_layout.addRow(cw.frame_widget())
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Method')), self.QComboBox_wfrmd_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('X_center (Base)')),
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Imaging')))
+        image_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Method')), self.QComboBox_wfrmd_img)
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Base)')),
                                                     self.QSpinBox_base_xcenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Y_center (Base)')),
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Base)')),
                                                     self.QSpinBox_base_ycenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('X_center (Offset)')),
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Offset)')),
                                                     self.QSpinBox_offset_xcenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Y_center (Offset)')),
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Offset)')),
                                                     self.QSpinBox_offset_ycenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Lenslet X')), self.QSpinBox_n_lenslets_x_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Lenslet Y')), self.QSpinBox_n_lenslets_y_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Spacing')), self.QSpinBox_spacing_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Radius')), self.QSpinBox_radius_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.label_widget(str('Background')),
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet X')), self.QSpinBox_n_lenslets_x_img)
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet Y')), self.QSpinBox_n_lenslets_y_img)
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Spacing')), self.QSpinBox_spacing_img)
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Radius')), self.QSpinBox_radius_img)
+        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
                                                     self.QDoubleSpinBox_img_background)
 
         layout_parameters.addWidget(self.confocal_shwfs_parameters_scroll_area)
@@ -152,15 +153,15 @@ class AOWidget(QtWidgets.QWidget):
     def _create_shwfs_widgets(self):
         layout_shwfs = QtWidgets.QHBoxLayout()
 
-        self.QComboBox_wfs_camera_selection = cw.combobox_widget(list_items=["EMCCD", "SCMOS", "Thorlabs"])
-        self.QPushButton_img_shwfs_base = cw.pushbutton_widget('SetBase', enable=True)
-        self.QPushButton_run_img_wfs = cw.pushbutton_widget('RunWFS', checkable=True)
-        self.QPushButton_run_img_wfr = cw.pushbutton_widget('RunWFR', enable=True)
-        self.QPushButton_img_shwfs_compute_wf = cw.pushbutton_widget('ComputeWF', enable=True)
-        self.QPushButton_img_shwfs_save_wf = cw.pushbutton_widget('SaveWF', enable=True)
-        self.QPushButton_img_shwfs_acquisition = cw.pushbutton_widget('ACQ')
+        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "Thorlabs"])
+        self.QPushButton_img_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
+        self.QPushButton_run_img_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
+        self.QPushButton_run_img_wfr = cw.PushButtonWidget('RunWFR', enable=True)
+        self.QPushButton_img_shwfs_compute_wf = cw.PushButtonWidget('ComputeWF', enable=True)
+        self.QPushButton_img_shwfs_save_wf = cw.PushButtonWidget('SaveWF', enable=True)
+        self.QPushButton_img_shwfs_acquisition = cw.PushButtonWidget('ACQ')
         self.image_shwfs_scroll_area, image_shwfs_scroll_layout = cw.create_scroll_area()
-        image_shwfs_scroll_layout.addRow(cw.label_widget(str('Camera')), self.QComboBox_wfs_camera_selection)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Camera')), self.QComboBox_wfs_camera_selection)
         image_shwfs_scroll_layout.addRow(self.QPushButton_run_img_wfs, self.QPushButton_img_shwfs_base)
         image_shwfs_scroll_layout.addRow(self.QPushButton_run_img_wfr, self.QPushButton_img_shwfs_acquisition)
         image_shwfs_scroll_layout.addRow(self.QPushButton_img_shwfs_compute_wf, self.QPushButton_img_shwfs_save_wf)
@@ -171,35 +172,35 @@ class AOWidget(QtWidgets.QWidget):
     def _create_dm_widgets(self):
         layout_deformablemirror = QtWidgets.QGridLayout()
 
-        self.QComboBox_dms = cw.combobox_widget(list_items=[])
-        self.QComboBox_wfsmd = cw.combobox_widget(list_items=['phase', 'zonal', 'modal'])
-        self.QSpinBox_actuator = cw.spinbox_widget(0, 96, 1, 0)
-        self.QDoubleSpinBox_actuator_push = cw.doublespinbox_widget(-1, 1, 0.005, 3, 0)
-        self.QPushButton_push_actuator = cw.pushbutton_widget('Push')
-        self.QPushButton_influence_fuction_laser = cw.pushbutton_widget('InfluFunc')
-        self.QSpinBox_zernike_mode = cw.spinbox_widget(0, 100, 1, 0)
-        self.QDoubleSpinBox_zernike_mode_amp = cw.doublespinbox_widget(-20, 20, 0.01, 2, 0)
-        self.QPushButton_set_zernike_mode = cw.pushbutton_widget('Set Zernike')
-        self.QComboBox_cmd = cw.combobox_widget(list_items=['0', '1'])
+        self.QComboBox_dms = cw.ComboBoxWidget(list_items=[])
+        self.QComboBox_wfsmd = cw.ComboBoxWidget(list_items=['phase', 'zonal', 'modal'])
+        self.QSpinBox_actuator = cw.SpinBoxWidget(0, 96, 1, 0)
+        self.QDoubleSpinBox_actuator_push = cw.DoubleSpinBoxWidget(-1, 1, 0.005, 3, 0)
+        self.QPushButton_push_actuator = cw.PushButtonWidget('Push')
+        self.QPushButton_influence_fuction_laser = cw.PushButtonWidget('InfluFunc')
+        self.QSpinBox_zernike_mode = cw.SpinBoxWidget(0, 100, 1, 0)
+        self.QDoubleSpinBox_zernike_mode_amp = cw.DoubleSpinBoxWidget(-20, 20, 0.01, 2, 0)
+        self.QPushButton_set_zernike_mode = cw.PushButtonWidget('Set Zernike')
+        self.QComboBox_cmd = cw.ComboBoxWidget(list_items=['0', '1'])
         self.QComboBox_cmd.setCurrentIndex(1)
-        self.QPushButton_setDM = cw.pushbutton_widget('Set DM')
-        self.QPushButton_load_dm = cw.pushbutton_widget('Load DM')
-        self.QPushButton_update_cmd = cw.pushbutton_widget('Add DM')
-        self.QPushButton_save_dm = cw.pushbutton_widget('Save DM')
+        self.QPushButton_setDM = cw.PushButtonWidget('Set DM')
+        self.QPushButton_load_dm = cw.PushButtonWidget('Load DM')
+        self.QPushButton_update_cmd = cw.PushButtonWidget('Add DM')
+        self.QPushButton_save_dm = cw.PushButtonWidget('Save DM')
 
-        layout_deformablemirror.addWidget(cw.label_widget(str('DM')), 0, 0, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('DM')), 0, 0, 1, 1)
         layout_deformablemirror.addWidget(self.QComboBox_dms, 0, 1, 1, 1)
-        layout_deformablemirror.addWidget(cw.label_widget(str('Method')), 0, 2, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('Method')), 0, 2, 1, 1)
         layout_deformablemirror.addWidget(self.QComboBox_wfsmd, 0, 3, 1, 1)
-        layout_deformablemirror.addWidget(cw.label_widget(str('Actuator')), 1, 0, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('Actuator')), 1, 0, 1, 1)
         layout_deformablemirror.addWidget(self.QSpinBox_actuator, 1, 1, 1, 1)
-        layout_deformablemirror.addWidget(cw.label_widget(str('Push')), 2, 0, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('Push')), 2, 0, 1, 1)
         layout_deformablemirror.addWidget(self.QDoubleSpinBox_actuator_push, 2, 1, 1, 1)
         layout_deformablemirror.addWidget(self.QPushButton_push_actuator, 3, 0, 1, 1)
         layout_deformablemirror.addWidget(self.QPushButton_influence_fuction_laser, 3, 1, 1, 1)
-        layout_deformablemirror.addWidget(cw.label_widget(str('Zernike Mode')), 1, 2, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('Zernike Mode')), 1, 2, 1, 1)
         layout_deformablemirror.addWidget(self.QSpinBox_zernike_mode, 1, 3, 1, 1)
-        layout_deformablemirror.addWidget(cw.label_widget(str('Amplitude')), 2, 2, 1, 1)
+        layout_deformablemirror.addWidget(cw.LabelWidget(str('Amplitude')), 2, 2, 1, 1)
         layout_deformablemirror.addWidget(self.QDoubleSpinBox_zernike_mode_amp, 2, 3, 1, 1)
         layout_deformablemirror.addWidget(self.QPushButton_set_zernike_mode, 3, 2, 1, 1)
         layout_deformablemirror.addWidget(self.QComboBox_cmd, 4, 0, 1, 1)
@@ -212,10 +213,10 @@ class AOWidget(QtWidgets.QWidget):
     def _create_dwfs_widgets(self):
         layout_dwfs = QtWidgets.QGridLayout()
 
-        self.QSpinBox_close_loop_number = cw.spinbox_widget(0, 100, 1, 1)
-        self.QPushButton_dwfs_cl_correction = cw.pushbutton_widget('Close Loop Correction')
+        self.QSpinBox_close_loop_number = cw.SpinBoxWidget(0, 100, 1, 1)
+        self.QPushButton_dwfs_cl_correction = cw.PushButtonWidget('Close Loop Correction')
 
-        layout_dwfs.addWidget(cw.label_widget(str('Loop #   (0 - infinite)')), 0, 0, 1, 1)
+        layout_dwfs.addWidget(cw.LabelWidget(str('Loop #   (0 - infinite)')), 0, 0, 1, 1)
         layout_dwfs.addWidget(self.QSpinBox_close_loop_number, 0, 1, 1, 1)
         layout_dwfs.addWidget(self.QPushButton_dwfs_cl_correction, 0, 2, 1, 1)
         return layout_dwfs
@@ -223,37 +224,40 @@ class AOWidget(QtWidgets.QWidget):
     def _create_sensorless_widgets(self):
         layout_sensorless = QtWidgets.QGridLayout()
 
-        self.QSpinBox_zernike_mode_start = cw.spinbox_widget(1, 64, 1, 4)
-        self.QSpinBox_zernike_mode_stop = cw.spinbox_widget(1, 64, 1, 10)
-        self.QDoubleSpinBox_zernike_mode_amps_start = cw.doublespinbox_widget(-50, 50, 0.005, 3, -0.01)
-        self.QSpinBox_zernike_mode_amps_stepnum = cw.spinbox_widget(0, 50, 2, 3)
-        self.QDoubleSpinBox_zernike_mode_amps_step = cw.doublespinbox_widget(-50, 50, 0.005, 3, 0.01)
-        self.QDoubleSpinBox_lpf = cw.doublespinbox_widget(0, 1, 0.05, 2, 0.1)
-        self.QDoubleSpinBox_hpf = cw.doublespinbox_widget(0, 1, 0.05, 2, 0.6)
-        self.QComboBox_metric = cw.combobox_widget(list_items=['Max(Intensity)', 'Sum(Intensity)',
-                                                               'SNR(FFT)', 'HighPass(FFT)'])
-        self.QPushButton_sensorless_run = cw.pushbutton_widget('Run AO')
-        self.QPushButton_sensorless_save = cw.pushbutton_widget('Save Results')
+        self.QSpinBox_zernike_mode_start = cw.SpinBoxWidget(1, 64, 1, 4)
+        self.QSpinBox_zernike_mode_stop = cw.SpinBoxWidget(1, 64, 1, 10)
+        self.QDoubleSpinBox_zernike_mode_amps_start = cw.DoubleSpinBoxWidget(-50, 50, 0.005, 3, -0.01)
+        self.QSpinBox_zernike_mode_amps_stepnum = cw.SpinBoxWidget(0, 50, 2, 3)
+        self.QDoubleSpinBox_zernike_mode_amps_step = cw.DoubleSpinBoxWidget(-50, 50, 0.005, 3, 0.01)
+        self.QDoubleSpinBox_lpf = cw.DoubleSpinBoxWidget(0, 1, 0.05, 2, 0.1)
+        self.QDoubleSpinBox_hpf = cw.DoubleSpinBoxWidget(0, 1, 0.05, 2, 0.6)
+        self.QComboBox_metric = cw.ComboBoxWidget(list_items=['Max(Intensity)', 'Sum(Intensity)', 'Mask(Intensity)',
+                                                              'SNR(FFT)', 'HighPass(FFT)'])
+        self.QPushButton_sensorless_run = cw.PushButtonWidget('Run AO')
+        self.QPushButton_sensorless_auto = cw.PushButtonWidget('Auto AO')
+        self.QPushButton_sensorless_save = cw.PushButtonWidget('Save Results')
 
-        layout_sensorless.addWidget(cw.label_widget(str('Zernike Modes')), 0, 0, 1, 2)
-        layout_sensorless.addWidget(cw.label_widget(str('From')), 1, 0, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('Zernike Modes')), 0, 0, 1, 2)
+        layout_sensorless.addWidget(cw.LabelWidget(str('From')), 1, 0, 1, 1)
         layout_sensorless.addWidget(self.QSpinBox_zernike_mode_start, 1, 1, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('To')), 2, 0, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('To')), 2, 0, 1, 1)
         layout_sensorless.addWidget(self.QSpinBox_zernike_mode_stop, 2, 1, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('Amplitudes')), 0, 2, 1, 2)
-        layout_sensorless.addWidget(cw.label_widget(str('From')), 1, 2, 1, 1)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_auto, 3, 0, 1, 2)
+        layout_sensorless.addWidget(cw.LabelWidget(str('Amplitudes')), 0, 2, 1, 2)
+        layout_sensorless.addWidget(cw.LabelWidget(str('From')), 1, 2, 1, 1)
         layout_sensorless.addWidget(self.QDoubleSpinBox_zernike_mode_amps_start, 1, 3, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('StepNum')), 2, 2, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('StepNum')), 2, 2, 1, 1)
         layout_sensorless.addWidget(self.QSpinBox_zernike_mode_amps_stepnum, 2, 3, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('StepSize')), 3, 2, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('StepSize')), 3, 2, 1, 1)
         layout_sensorless.addWidget(self.QDoubleSpinBox_zernike_mode_amps_step, 3, 3, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('LPF')), 0, 4, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('LPF')), 0, 4, 1, 1)
         layout_sensorless.addWidget(self.QDoubleSpinBox_lpf, 1, 4, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('HPF')), 2, 4, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('HPF')), 2, 4, 1, 1)
         layout_sensorless.addWidget(self.QDoubleSpinBox_hpf, 3, 4, 1, 1)
-        layout_sensorless.addWidget(cw.label_widget(str('Image Metric')), 0, 5, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('Image Metric')), 0, 5, 1, 1)
         layout_sensorless.addWidget(self.QComboBox_metric, 1, 5, 1, 1)
         layout_sensorless.addWidget(self.QPushButton_sensorless_run, 2, 5, 1, 1)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_auto, 2, 5, 1, 1)
         layout_sensorless.addWidget(self.QPushButton_sensorless_save, 3, 5, 1, 1)
         return layout_sensorless
 
@@ -274,6 +278,7 @@ class AOWidget(QtWidgets.QWidget):
         self.QPushButton_save_dm.clicked.connect(self.save_dm_cmd)
         self.QPushButton_dwfs_cl_correction.clicked.connect(self.run_close_loop_correction)
         self.QPushButton_sensorless_run.clicked.connect(self.run_sensorless_correction)
+        self.QPushButton_sensorless_auto.clicked.connect(self.run_sensorless_auto)
         self.QPushButton_sensorless_save.clicked.connect(self.save_sensorless_correction)
 
     def _set_initial_values(self):
@@ -358,6 +363,10 @@ class AOWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def run_sensorless_correction(self):
         self.Signal_sensorlessAO_run.emit()
+
+    @QtCore.pyqtSlot()
+    def run_sensorless_auto(self):
+        self.Signal_sensorlessAO_auto.emit()
 
     @QtCore.pyqtSlot()
     def save_sensorless_correction(self):

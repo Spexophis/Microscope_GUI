@@ -8,6 +8,7 @@ from miao.widgets import widget_ao, widget_con, widget_view
 
 class MainWidget(QtWidgets.QMainWindow):
     Signal_quit = QtCore.pyqtSignal()
+    Signal_interrupt = QtCore.pyqtSignal()
 
     def __init__(self, config, logg, path, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,7 +24,8 @@ class MainWidget(QtWidgets.QMainWindow):
         self.dock_con = self.create_dock_widget(self.con_view)
         self.dock_ao = self.create_dock_widget(self.ao_view)
 
-        self.dialog, self.dialog_text = cw.dialog(labtex=True)
+        self.dialog, self.dialog_text = cw.create_dialog(labtex=True)
+        self.dialog.setModal(True)
 
         self.setCentralWidget(self.view_view)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dock_con)
@@ -67,17 +69,31 @@ class MainWidget(QtWidgets.QMainWindow):
         super().closeEvent(event)
 
     def get_dialog(self):
-        self.dialog.exec_()
+        self.dialog.show()
         self.dialog_text.setText(f"Task is running, please wait...")
+        self.refresh_gui()
 
     def get_file_dialog(self, sw="Save File"):
-        file_dialog = cw.create_file_dialogue(name=sw, file_filter="All Files (*)", default_dir=self.data_folder)
+        file_dialog = cw.FileDialogWidget(name=sw, file_filter="All Files (*)", default_dir=self.data_folder)
         if file_dialog.exec_() == QtWidgets.QFileDialog.Accepted:
             selected_file = file_dialog.selectedFiles()
             if selected_file:
                 return selected_file[0]
             else:
                 return None
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.Signal_interrupt.emit()
+        elif event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            print("Enter key press ignored")
+            return
+        else:
+            super().keyPressEvent(event)
+
+    @staticmethod
+    def refresh_gui():
+        QtWidgets.QApplication.processEvents()
 
 
 class CustomDockTitleBar(QtWidgets.QWidget):

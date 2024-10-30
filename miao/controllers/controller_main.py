@@ -15,6 +15,7 @@ from miao.tools import tool_zernike as tz
 class MainController(QtCore.QObject):
     sada = QtCore.pyqtSignal(str, np.ndarray, list)
     sazf = QtCore.pyqtSignal(list, np.ndarray)
+    sig_plt = QtCore.pyqtSignal(list, list)
 
     def __init__(self, view, module, process, config, logg, path, parent=None):
         super().__init__(parent)
@@ -75,8 +76,10 @@ class MainController(QtCore.QObject):
         self.thread_wfs.finished.connect(self.wfsWorker.stop)
 
     def _set_signal_connections(self):
+        self.v.Signal_interrupt.connect(self.interrupt_loop)
         self.sada.connect(self.save_data)
         self.sazf.connect(self.save_zernike_coeffs)
+        self.sig_plt.connect(self.plot_)
         # MCL Piezo
         self.v.con_view.Signal_piezo_move_usb.connect(self.set_piezo_positions_usb)
         self.v.con_view.Signal_piezo_move.connect(self.set_piezo_positions)
@@ -101,6 +104,7 @@ class MainController(QtCore.QObject):
         self.v.con_view.Signal_fft.connect(self.fft)
         self.v.con_view.Signal_plot_profile.connect(self.plot_live)
         self.v.con_view.Signal_add_profile.connect(self.plot_add)
+        self.v.con_view.Signal_set_mask.connect(self.set_array_mask)
         # NIDAQ
         self.v.con_view.Signal_daq_update.connect(self.update_daq_sample_rate)
         # Main Data Recording
@@ -127,9 +131,12 @@ class MainController(QtCore.QObject):
         # AO
         self.v.ao_view.Signal_img_shwfs_correct_wf.connect(self.run_close_loop_correction)
         self.v.ao_view.Signal_sensorlessAO_run.connect(self.run_sensorless_iteration)
+        self.v.ao_view.Signal_sensorlessAO_auto.connect(self.run_auto_sensorless)
 
     def _initial_setup(self):
         try:
+
+            self.loop_flag = True
 
             p = self.m.md.get_position_steps_taken(3)
             self.con_controller.display_deck_position(p)
@@ -164,12 +171,15 @@ class MainController(QtCore.QObject):
         if callback is not None:
             self.task_worker.signals.finished.connect(callback)
         self.task_thread.start()
-        self.v.get_dialog()
 
     def task_finish(self):
         self.task_thread.quit()
         self.task_thread.wait()
-        self.v.dialog.accept()
+        self.v.dialog.close()
+
+    @QtCore.pyqtSlot()
+    def interrupt_loop(self):
+        self.loop_flag = False
 
     @QtCore.pyqtSlot()
     def deck_read_position(self):
@@ -378,7 +388,7 @@ class MainController(QtCore.QObject):
                 self.m.cam_set[0].set_gain()
             if self.cameras[key] == 1:
                 x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
-                self.m.cam_set[1].set_roi(bx, by, x, x + nx - 1, y, y + ny - 1)
+                self.m.cam_set[1].set_roi(bx, by, x, x + nx, y, y + ny)
             if self.cameras[key] == 2:
                 x, y, nx, ny, bx, by = self.con_controller.get_thorcam_roi()
                 self.m.cam_set[2].set_roi(x, y, x + nx - 1, y + ny - 1)
@@ -609,6 +619,14 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Error plotting digital triggers: {e}")
 
+    @QtCore.pyqtSlot(list, list)
+    def plot_(self, x, d):
+        try:
+            self.view_controller.plot_update(data=d, x=x)
+            self.v.refresh_gui()
+        except Exception as e:
+            self.logg.error(f"Error plotting profile: {e}")
+
     @QtCore.pyqtSlot(str, int)
     def data_acquisition(self, acq_mod: str, acq_num: int):
         if acq_mod == "Wide Field 2D":
@@ -707,6 +725,7 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_focus_finding(self):
+        self.v.get_dialog()
         self.run_task(task=self.focus_finding)
 
     def prepare_focus_locking(self):
@@ -802,6 +821,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping widefield zstack: {e}")
 
     def run_widefield_zstack(self, n: int):
+        self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
 
     def prepare_dot_scanning(self):
@@ -849,6 +869,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping dot scanning: {e}")
 
     def run_dot_scanning(self, n: int):
+        self.v.get_dialog()
         self.run_task(task=self.dot_scanning, iteration=n)
 
     def prepare_monalisa_scan(self):
@@ -896,6 +917,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping monalisa scanning: {e}")
 
     def run_monalisa_scan(self, n: int):
+        self.v.get_dialog()
         self.run_task(task=self.monalisa_scan_2d, iteration=n)
 
     def pattern_alignment(self):
@@ -958,6 +980,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping pattern alignment: {e}")
 
     def run_pattern_alignment(self):
+        self.v.get_dialog()
         self.run_task(task=self.pattern_alignment)
 
     def prepare_focal_array_scan(self):
@@ -1023,6 +1046,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping focal array scanning: {e}")
 
     def run_focal_array_scan(self):
+        self.v.get_dialog()
         self.run_task(task=self.focal_array_scan)
 
     def prepare_grid_pattern_scan(self):
@@ -1093,6 +1117,7 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping grid pattern scanning: {e}")
 
     def run_grid_pattern_scan(self):
+        self.v.get_dialog()
         self.run_task(task=self.grid_pattern_scan)
 
     @QtCore.pyqtSlot(str)
@@ -1241,6 +1266,7 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_img_wfr(self):
+        self.v.get_dialog()
         self.run_task(task=self.img_wfr, callback=self.imshow_img_wfr)
 
     def img_wfr(self):
@@ -1259,6 +1285,7 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_compute_img_wf(self):
+        self.v.get_dialog()
         self.run_task(task=self.compute_img_wf)
 
     def compute_img_wf(self):
@@ -1390,6 +1417,7 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_influence_function(self):
+        self.v.get_dialog()
         self.run_task(self.influence_function)
 
     def prepare_close_loop_correction(self):
@@ -1439,6 +1467,7 @@ class MainController(QtCore.QObject):
             self.finish_close_loop_correction()
             return
         try:
+            self.v.get_dialog()
             self.m.cam_set[self.cameras["wfs"]].start_live()
             time.sleep(0.02)
             self.run_task(task=self.close_loop_correction, iteration=nlp)
@@ -1447,6 +1476,14 @@ class MainController(QtCore.QObject):
             self.logg.error(f"CloseLoop Correction Error: {e}")
             return
         self.finish_close_loop_correction()
+
+    @QtCore.pyqtSlot()
+    def set_array_mask(self):
+        m = self.view_controller.get_image_data(layer=self.cameras["imaging"])
+        m = m - m.min()
+        m = m / m.max()
+        m[m < 0.6] = 0.
+        self.view_controller.plot_msk(data=m)
 
     def prepare_sensorless_iteration(self):
         vd_mod = self.con_controller.get_live_mode()
@@ -1470,7 +1507,18 @@ class MainController(QtCore.QObject):
             self.lasers_off()
             raise ValueError("Invalid video mode")
 
-    def sensorless_iteration(self):
+    def sensorless_iteration(self, dms):
+        ims = []
+        for dmsp in dms:
+            self.dfm.set_dm(dmsp)
+            time.sleep(0.016)
+            self.m.daq.run_triggers()
+            time.sleep(0.032)
+            self.m.daq.stop_triggers(_close=False)
+            ims.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
+        return ims
+
+    def sensorless_iterations(self):
         try:
             self.prepare_sensorless_iteration()
         except Exception as e:
@@ -1478,7 +1526,9 @@ class MainController(QtCore.QObject):
             return
         try:
             lpr, hpr, mf = self.ao_controller.get_ao_parameters()
-            name = time.strftime("%Y%m%d_%H%M%S_") + '_ao_iteration_' + mf
+            if mf == 'Mask(Intensity)':
+                msk = self.view_controller.get_image_data(7)
+            name = time.strftime("%Y%m%d_%H%M%S_") + '_auto_ao_iterations_' + mf
             new_folder = os.path.join(self.data_folder, name)
             os.makedirs(new_folder, exist_ok=True)
             self.logg.info(f'Directory {new_folder} has been created successfully.')
@@ -1488,71 +1538,68 @@ class MainController(QtCore.QObject):
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
             md = self.ao_controller.get_img_wfs_method()
+            amprange = [amp_start + step_number * amp_step for step_number in range(amp_step_number)]
             results = [('Mode', 'Amp', 'Metric')]
             za = []
             mv = []
             zp = [0] * self.dfm.n_zernike
             cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
             self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.2)
-            self.logg.info("Sensorless AO iteration starts")
+            time.sleep(0.1)
+            self.logg.info("Automated sensorless AO iterations start")
             self.dfm.set_dm(cmd)
-            time.sleep(0.02)
+            time.sleep(0.016)
             self.m.daq.run_triggers()
-            time.sleep(0.04)
+            time.sleep(0.032)
             self.m.daq.stop_triggers(_close=False)
-            fn = os.path.join(new_folder, 'original.tif')
-            tf.imwrite(fn, self.m.cam_set[self.cameras["imaging"]].get_last_image())
+            fn = new_folder + r"\original.tiff"
+            tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             for mode in range(mode_start, mode_stop + 1):
                 self.v.dialog_text.setText(f"Zernike mode #{mode}")
-                amprange = []
-                dt = []
-                for stnm in range(amp_step_number):
-                    amp = amp_start + stnm * amp_step
-                    amprange.append(amp)
-                    self.dfm.set_dm(self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, amp, method=md), cmd))
-                    # self.dfm.set_dm(self.dfm.cmd_add([i * amp for i in self.dfm.z2c[mode]], cmd))
-                    time.sleep(0.02)
-                    self.m.daq.run_triggers()
-                    time.sleep(0.04)
-                    self.m.daq.stop_triggers(_close=False)
-                    fn = "zm%0.2d_amp%.4f" % (mode, amp)
-                    fn1 = os.path.join(new_folder, fn + '.tif')
-                    tf.imwrite(fn1, self.m.cam_set[self.cameras["imaging"]].get_last_image())
-                    if mf == "Max(Intensity)":
-                        dt.append(self.m.cam_set[self.cameras["imaging"]].get_last_image().max())
-                    if mf == "Sum(Intensity)":
-                        dt.append(self.m.cam_set[self.cameras["imaging"]].get_last_image().sum())
-                    if mf == "SNR(FFT)":
-                        dt.append(ipr.snr(self.m.cam_set[self.cameras["imaging"]].get_last_image(), lpr, hpr, True))
-                    if mf == "HighPass(FFT)":
-                        dt.append(ipr.hpf(self.m.cam_set[self.cameras["imaging"]].get_last_image(), hpr))
-                    results.append((mode, amp, dt[stnm]))
-                za.extend(amprange)
-                mv.extend(dt)
-                self.logg.info(f"zernike mode #{mode}, ({amprange}), ({dt})")
-                self.view_controller.plot_update(data=dt, x=amprange)
-                try:
-                    pmax = ipr.peak_find(amprange, dt)
-                    zp[mode] = pmax
-                    self.logg.info("setting mode %d at value of %.4f" % (mode, pmax))
-                    cmd = self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, pmax, method=md), cmd)
+                labels = ["zm%0.2d_amp%.4f" % (mode, amp) for amp in amprange]
+                cmds = [self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, amp, method=md), cmd) for amp in amprange]
+                images = self.sensorless_iteration(cmds)
+                if mf == "Max(Intensity)":
+                    mts = [img.max() for img in images]
+                if mf == "Sum(Intensity)":
+                    mts = [img.sum() for img in images]
+                if mf == 'Mask(Intensity)':
+                    mts = [(img * msk).sum() for img in images]
+                if mf == "SNR(FFT)":
+                    mts = [ipr.snr(img, lpr, hpr, True) for img in images]
+                if mf == "HighPass(FFT)":
+                    mts = [ipr.hpf(img, hpr) for img in images]
+                self.logg.info(f"zernike mode #{mode}, ({amprange}), ({mts})")
+                self.sig_plt.emit(amprange, mts)
+                pm = ipr.peak_find(amprange, mts)
+                if isinstance(pm, str):
+                    self.logg.error(f"zernike mode #{mode} " + pm)
+                else:
+                    zp[mode] = pm
+                    cmd = self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, pm, method=md), cmd)
                     self.dfm.set_dm(cmd)
-                except ValueError as e:
-                    self.logg.error(f"mode {mode} error {e}")
+                    self.logg.info("set mode %d at value of %.4f" % (mode, pm))
+                for amp, mt in zip(amprange, mts):
+                    results.append((mode, amp, mt))
+                za.extend(amprange)
+                mv.extend(mts)
+                fn = os.path.join(str(new_folder), f"zernike mode #{mode}.tiff")
+                with tf.TiffWriter(fn) as tif:
+                    for img, label in zip(images, labels):
+                        tif.write(img, description=label)
             self.dfm.set_dm(cmd)
-            time.sleep(0.02)
+            time.sleep(0.016)
             self.m.daq.run_triggers()
-            time.sleep(0.04)
+            time.sleep(0.032)
             self.m.daq.stop_triggers(_close=False)
-            fn = os.path.join(new_folder, 'final.tif')
-            tf.imwrite(fn, self.m.cam_set[self.cameras["imaging"]].get_last_image())
+            fn = new_folder + r"\final.tiff"
+            tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             self.dfm.dm_cmd.append(cmd)
             self.ao_controller.update_cmd_index()
             i = int(self.ao_controller.get_cmd_index())
             self.dfm.current_cmd = i
             self.dfm.write_cmd(new_folder, '_')
-            self.dfm.save_sensorless_results(os.path.join(new_folder, 'results.xlsx'), za, mv, zp)
+            self.dfm.save_sensorless_results(os.path.join(str(new_folder), 'results.xlsx'), za, mv, zp)
         except Exception as e:
             self.finish_sensorless_iteration()
             self.logg.error(f"Sensorless AO Error: {e}")
@@ -1570,7 +1617,95 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_sensorless_iteration(self):
-        self.run_task(task=self.sensorless_iteration)
+        self.v.get_dialog()
+        self.run_task(task=self.sensorless_iterations)
+
+    def auto_sensorless(self):
+        self.loop_flag = True
+        try:
+            self.prepare_sensorless_iteration()
+        except Exception as e:
+            self.logg.error(f"Prepare sensorless iteration Error: {e}")
+            return
+        try:
+            lpr, hpr, mf = self.ao_controller.get_ao_parameters()
+            name = time.strftime("%Y%m%d_%H%M%S_") + '_auto_ao_iterations_' + mf
+            new_folder = os.path.join(self.data_folder, name)
+            os.makedirs(new_folder, exist_ok=True)
+            self.logg.info(f'Directory {new_folder} has been created successfully.')
+        except Exception as e:
+            self.logg.error(f'Error creating directory for sensorless iteration: {e}')
+            return
+        try:
+            mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
+            md = self.ao_controller.get_img_wfs_method()
+            results = [('Mode', 'Amp', 'Metric')]
+            za = []
+            mv = []
+            zp = [0] * self.dfm.n_zernike
+            cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
+            self.m.cam_set[self.cameras["imaging"]].start_live()
+            time.sleep(0.1)
+            self.logg.info("Automated sensorless AO iterations start")
+            self.dfm.set_dm(cmd)
+            time.sleep(0.016)
+            self.m.daq.run_triggers()
+            time.sleep(0.032)
+            self.m.daq.stop_triggers(_close=False)
+            fn = new_folder + r"\original.tiff"
+            tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
+            for mode in range(mode_start, mode_stop + 1):
+                step_size = amp_step
+                self.v.dialog_text.setText(f"Zernike mode #{mode}")
+                while step_size >= amp_step:
+                    if self.loop_flag:
+                        amps = [- step_size + step_number * step_size for step_number in range(3)]
+                        cmds = [self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, amp, method=md), cmd) for amp in amps]
+                        images = self.sensorless_iteration(cmds)
+                        if mode == 3 or 10:
+                            mts = [-ipr.calculate_focus_measure_with_sobel(img) for img in images]
+                        else:
+                            mts = [ipr.hpf(img, hpr) for img in images]
+                        self.logg.info(f"zernike mode #{mode}, ({amps}), ({mts})")
+                        self.view_controller.plot_update(data=mts, x=amps)
+                        pm = ipr.peak_find(amps, mts)
+                        if isinstance(pm, str):
+                            self.logg.error(f"zernike mode #{mode} " + pm)
+                            step_size *= 1.5
+                        else:
+                            if step_size < amp_step:
+                                zp[mode] = pm
+                                cmd = self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, pm, method=md), cmd)
+                                self.dfm.set_dm(cmd)
+                                self.logg.info("set mode %d at value of %.4f" % (mode, pm))
+                                break
+                            else:
+                                step_size /= 1.5
+                    else:
+                        return
+            self.dfm.set_dm(cmd)
+            time.sleep(0.016)
+            self.m.daq.run_triggers()
+            time.sleep(0.032)
+            self.m.daq.stop_triggers(_close=False)
+            fn = new_folder + r"\final.tiff"
+            tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
+            self.dfm.dm_cmd.append(cmd)
+            self.ao_controller.update_cmd_index()
+            i = int(self.ao_controller.get_cmd_index())
+            self.dfm.current_cmd = i
+            self.dfm.write_cmd(new_folder, '_')
+            self.dfm.save_sensorless_results(os.path.join(str(new_folder), 'results.xlsx'), za, mv, zp)
+        except Exception as e:
+            self.finish_sensorless_iteration()
+            self.logg.error(f"Sensorless AO Error: {e}")
+            return
+        self.finish_sensorless_iteration()
+
+    @QtCore.pyqtSlot()
+    def run_auto_sensorless(self):
+        self.v.get_dialog()
+        self.run_task(task=self.auto_sensorless)
 
     def prepare_shwfs_acquisition(self):
         self.lasers = self.con_controller.get_lasers()
@@ -1655,6 +1790,7 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run_shwfs_acquisition(self):
+        self.v.get_dialog()
         self.run_task(self.shwfs_acquisition)
 
 
