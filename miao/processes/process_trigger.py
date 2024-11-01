@@ -855,7 +855,7 @@ class TriggerSequence:
         self.line_interval_samples = int(np.ceil(((
                                                           self.samples_high + self.samples_low) * self.dot_pos.size + self.samples_delay + self.samples_offset + self.ramp_down_samples) / interval_line_number))
         self.line_exposure_samples = (self.samples_high + self.samples_low) * self.dot_pos.size
-        self.trigger_delay_samples = 9 * self.line_interval_samples
+        self.trigger_delay_samples = 10 * self.line_interval_samples
         return self.line_exposure_samples / self.sample_rate, self.line_interval_samples / self.sample_rate
 
     def generate_digital_scanning_triggers_rolling(self, lasers, camera):
