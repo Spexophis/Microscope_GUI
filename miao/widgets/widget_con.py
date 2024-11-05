@@ -808,33 +808,36 @@ class ConWidget(QtWidgets.QWidget):
     def save_digital_timing_preset(self, m: str):
         if m == "live":
             set_name = self.QComboBox_live_modes.currentText()
-        if m == "acqusition":
+        elif m == "acquisition":
             set_name = self.QComboBox_acquisition_modes.currentText()
-        if not set_name:
+        else:
+            set_name = None
+        if set_name:
+            self.digital_timing_presets[set_name] = {
+                    "QDoubleSpinBox_step_x": self.QDoubleSpinBox_step_x.value(),
+                    "QDoubleSpinBox_step_y": self.QDoubleSpinBox_step_y.value(),
+                    "QDoubleSpinBox_step_z": self.QDoubleSpinBox_step_z.value(),
+                    "QDoubleSpinBox_range_x": self.QDoubleSpinBox_range_x.value(),
+                    "QDoubleSpinBox_range_y": self.QDoubleSpinBox_range_y.value(),
+                    "QDoubleSpinBox_range_z": self.QDoubleSpinBox_range_z.value(),
+                    "QDoubleSpinBox_ttl_start_on_405": self.QDoubleSpinBox_ttl_start_on_405.value(),
+                    "QDoubleSpinBox_ttl_stop_on_405": self.QDoubleSpinBox_ttl_stop_on_405.value(),
+                    "QDoubleSpinBox_ttl_start_off_488_0": self.QDoubleSpinBox_ttl_start_off_488_0.value(),
+                    "QDoubleSpinBox_ttl_stop_off_488_0": self.QDoubleSpinBox_ttl_stop_off_488_0.value(),
+                    "QDoubleSpinBox_ttl_start_off_488_1": self.QDoubleSpinBox_ttl_start_off_488_1.value(),
+                    "QDoubleSpinBox_ttl_stop_off_488_1": self.QDoubleSpinBox_ttl_stop_off_488_1.value(),
+                    "QDoubleSpinBox_ttl_start_read_488_2": self.QDoubleSpinBox_ttl_start_read_488_2.value(),
+                    "QDoubleSpinBox_ttl_stop_read_488_2": self.QDoubleSpinBox_ttl_stop_read_488_2.value(),
+                    "QDoubleSpinBox_ttl_start_emccd": self.QDoubleSpinBox_ttl_start_emccd.value(),
+                    "QDoubleSpinBox_ttl_stop_emccd": self.QDoubleSpinBox_ttl_stop_emccd.value(),
+                    "QDoubleSpinBox_ttl_start_scmos": self.QDoubleSpinBox_ttl_start_scmos.value(),
+                    "QDoubleSpinBox_ttl_stop_scmos": self.QDoubleSpinBox_ttl_stop_scmos.value(),
+                    "QDoubleSpinBox_ttl_start_tis": self.QDoubleSpinBox_ttl_start_tis.value(),
+                    "QDoubleSpinBox_ttl_stop_tis": self.QDoubleSpinBox_ttl_stop_tis.value(),
+            }
+            self.config.write_config(self.digital_timing_presets, self.config.configs["Digital Timing Presets"])
+        else:
             return
-        self.digital_timing_presets[set_name] = {
-                "QDoubleSpinBox_step_x": self.QDoubleSpinBox_step_x.value(),
-                "QDoubleSpinBox_step_y": self.QDoubleSpinBox_step_y.value(),
-                "QDoubleSpinBox_step_z": self.QDoubleSpinBox_step_z.value(),
-                "QDoubleSpinBox_range_x": self.QDoubleSpinBox_range_x.value(),
-                "QDoubleSpinBox_range_y": self.QDoubleSpinBox_range_y.value(),
-                "QDoubleSpinBox_range_z": self.QDoubleSpinBox_range_z.value(),
-                "QDoubleSpinBox_ttl_start_on_405": self.QDoubleSpinBox_ttl_start_on_405.value(),
-                "QDoubleSpinBox_ttl_stop_on_405": self.QDoubleSpinBox_ttl_stop_on_405.value(),
-                "QDoubleSpinBox_ttl_start_off_488_0": self.QDoubleSpinBox_ttl_start_off_488_0.value(),
-                "QDoubleSpinBox_ttl_stop_off_488_0": self.QDoubleSpinBox_ttl_stop_off_488_0.value(),
-                "QDoubleSpinBox_ttl_start_off_488_1": self.QDoubleSpinBox_ttl_start_off_488_1.value(),
-                "QDoubleSpinBox_ttl_stop_off_488_1": self.QDoubleSpinBox_ttl_stop_off_488_1.value(),
-                "QDoubleSpinBox_ttl_start_read_488_2": self.QDoubleSpinBox_ttl_start_read_488_2.value(),
-                "QDoubleSpinBox_ttl_stop_read_488_2": self.QDoubleSpinBox_ttl_stop_read_488_2.value(),
-                "QDoubleSpinBox_ttl_start_emccd": self.QDoubleSpinBox_ttl_start_emccd.value(),
-                "QDoubleSpinBox_ttl_stop_emccd": self.QDoubleSpinBox_ttl_stop_emccd.value(),
-                "QDoubleSpinBox_ttl_start_scmos": self.QDoubleSpinBox_ttl_start_scmos.value(),
-                "QDoubleSpinBox_ttl_stop_scmos": self.QDoubleSpinBox_ttl_stop_scmos.value(),
-                "QDoubleSpinBox_ttl_start_tis": self.QDoubleSpinBox_ttl_start_tis.value(),
-                "QDoubleSpinBox_ttl_stop_tis": self.QDoubleSpinBox_ttl_stop_tis.value(),
-        }
-        self.config.write_config(self.digital_timing_presets, self.config.configs["Digital Timing Presets"])
 
     def load_digital_timing_presets(self):
         try:
