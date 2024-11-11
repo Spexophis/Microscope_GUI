@@ -23,7 +23,7 @@ class MicroscopeGUI(QtWidgets.QMainWindow):
             self.error_n_exit(f"Error loading configuration: {e}")
             return
 
-        self.data_folder = self.config.configs["Data Path"] + r"\\" + time.strftime("%Y%m%d")
+        self.data_folder = f"{self.config.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
         try:
             os.makedirs(self.data_folder, exist_ok=True)
             print(f'Directory {self.data_folder} has been created successfully.')

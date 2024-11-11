@@ -3,13 +3,14 @@ import os
 import struct
 import sys
 import time
+
 import numpy as np
 import pandas as pd
 import tifffile as tf
 
-from miao.tools import tool_zernike as tz
 from miao.tools import tool_improc as ipr
 from miao.tools import tool_sysctrl as syct
+from miao.tools import tool_zernike as tz
 
 sys.path.append(r'C:\Program Files\Alpao\SDK\Samples\Python3')
 if (8 * struct.calcsize("P")) == 32:
@@ -77,7 +78,8 @@ class DeformableMirror:
                 self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name]["Zonal Control Matrix"])
             self.initial_flat = self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name][
                 "Initial Flat"]
-            self.ctrl_calib = self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name]["Control Calibration"]
+            self.ctrl_calib = self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name][
+                "Control Calibration"]
         except Exception as e:
             self.logg.error(f"Error Loading DM {self.dm_name} files: {e}")
         try:
@@ -216,6 +218,15 @@ class DeformableMirror:
                 for sheet_name, list_data in data.items():
                     df = pd.DataFrame(list_data, index=np.arange(self.n_actuator), columns=['Push'])
                     df.to_excel(writer, sheet_name=sheet_name, index_label='Actuator')
+
+    def write_flat_cmd(self, t, cmd):
+        path = self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name]["Calibration File Folder"]
+        filename = f"flat_file_{self.dm_serial}_{t}.xlsx"
+        fd = os.path.join(path, filename)
+        df = pd.DataFrame(cmd, index=np.arange(self.n_actuator), columns=['Push'])
+        df.to_excel(str(fd), index_label='Actuator')
+        self.config.configs["Adaptive Optics"]["Deformable Mirrors"][self.dm_name]["Initial Flat"] = str(fd)
+        self.config.write_config(self.config.configs, self.config.cfd)
 
     def save_sensorless_results(self, fd, a, v, p):
         df1 = pd.DataFrame(v, index=a, columns=['Values'])

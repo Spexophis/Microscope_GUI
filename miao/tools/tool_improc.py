@@ -174,10 +174,18 @@ def hpf(img, hpr, relative=True, gau=True):
         return (np.abs(aft)).sum()
 
 
-def peak_find(x, y):
+def binomial_model(x, a, b, c):
+    return a * x**2 + b * x + c
+
+
+def peak_find(x, y, sigma_=0):
     x = np.asarray(x)
     y = np.asarray(y)
-    a, b, c = np.polyfit(x, y, 2)
+    if sigma_:
+        popt, pcov = curve_fit(binomial_model, x, y, sigma=np.full_like(y, sigma_))
+        a, b, c = popt
+    else:
+        a, b, c = np.polyfit(x, y, 2)
     p = -1 * b / a / 2.0
     if a > 0:
         return "No peak"

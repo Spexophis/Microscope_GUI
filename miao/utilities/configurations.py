@@ -5,7 +5,8 @@ class MicroscopeConfiguration:
 
     def __init__(self, fd=None):
         if fd:
-            self.configs = self.load_config(fd)
+            self.cfd = fd
+            self.configs = self.load_config(self.cfd)
         else:
             raise AttributeError(f"Configuration File Failed to Load")
 

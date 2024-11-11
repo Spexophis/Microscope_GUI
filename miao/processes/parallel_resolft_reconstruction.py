@@ -19,6 +19,7 @@ class ImageReconstruction:
     def load_data(self, fd):
         data = tf.TiffFile(fd)
         self.data_stack = data.asarray()
+        self.n, self.ny, self.nx = self.data_stack.shape
         page = data.pages[0]
         x_resolution = page.tags.get('XResolution')
         y_resolution = page.tags.get('YResolution')
@@ -30,7 +31,6 @@ class ImageReconstruction:
             self.pixel_size_y = int(factor / y_res_value) / factor
 
     def generate_coordinates(self):
-        self.n, self.ny, self.nx = self.data_stack.shape
         self.xv, self.yv = np.meshgrid(np.linspace(0, self.nx - 1, self.nx), np.linspace(0, self.ny - 1, self.ny))
         self.xv = self.pixel_size_x * self.xv
         self.yv = self.pixel_size_y * self.yv
@@ -82,10 +82,10 @@ class ImageReconstruction:
                 array += self.gaussian_1d(self.yv, y_center, self.sigma)
         return array
 
-    def create_gaussian_2d_array(self):
+    def create_gaussian_2d_array(self, t=True):
         array = np.zeros((self.ny, self.nx))
         for [y_center, x_center] in self.center_list:
-            array += self.gaussian_2d(self.xv, self.yv, x_center, y_center, self.sigma)
+            array += self.gaussian_2d(self.xv, self.yv, x_center, y_center, self.sigma, t)
         return array
 
     def apply_gaussian(self, stack):
@@ -141,11 +141,14 @@ class ImageReconstruction:
         msk = msk <= 1.
         return g * msk
 
-    def gaussian_2d(self, x_, y_, mu_x, mu_y, sigma):
+    def gaussian_2d(self, x_, y_, mu_x, mu_y, sigma, thr=True):
         g = np.exp(-((x_ - mu_x) ** 2 + (y_ - mu_y) ** 2) / (2 * sigma ** 2))
         msk = ((x_ - mu_x) ** 2 + (y_ - mu_y) ** 2) / (self.wd * sigma ** 2)
-        msk = msk <= 1.
-        return g * msk
+        if thr:
+            msk = msk <= 1.
+            return g * msk
+        else:
+            return g
 
     def extract_periods(self):
         self.image_avg = np.average(self.data_stack, axis=0)
@@ -164,8 +167,7 @@ class ImageReconstruction:
             periods.append(period)
         return periods, normalized_spectrum, sorted_peaks[1:5]
 
-    def fft_frequency_map(self):
-        rows, cols = self.ny, self.nx
+    def fft_frequency_map(self, rows, cols):
         freq_x = np.fft.fftfreq(cols, self.pixel_size_x)
         freq_y = np.fft.fftfreq(rows, self.pixel_size_y)
         fx, fy = np.meshgrid(freq_x, freq_y)

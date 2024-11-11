@@ -208,18 +208,18 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_stage_x_usb = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 20.000)
         self.QLCDNumber_piezo_position_x = cw.LCDNumberWidget()
         self.QDoubleSpinBox_stage_x = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 30.000)
-        self.QDoubleSpinBox_step_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.030)
-        self.QDoubleSpinBox_range_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.780)
+        self.QDoubleSpinBox_step_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.030)
+        self.QDoubleSpinBox_range_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.780)
         self.QDoubleSpinBox_stage_y_usb = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 20.000)
         self.QLCDNumber_piezo_position_y = cw.LCDNumberWidget()
         self.QDoubleSpinBox_stage_y = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 30.000)
-        self.QDoubleSpinBox_step_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.030)
-        self.QDoubleSpinBox_range_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.780)
+        self.QDoubleSpinBox_step_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.030)
+        self.QDoubleSpinBox_range_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.780)
         self.QDoubleSpinBox_stage_z_usb = cw.DoubleSpinBoxWidget(0, 100, 0.04, 2, 20.00)
         self.QLCDNumber_piezo_position_z = cw.LCDNumberWidget()
         self.QDoubleSpinBox_stage_z = cw.DoubleSpinBoxWidget(0, 100, 0.04, 2, 30.00)
-        self.QDoubleSpinBox_step_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.160)
-        self.QDoubleSpinBox_range_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 4.80)
+        self.QDoubleSpinBox_step_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.160)
+        self.QDoubleSpinBox_range_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 4.80)
         self.QDoubleSpinBox_piezo_return_time = cw.DoubleSpinBoxWidget(0, 50, 0.01, 2, 0.06)
         self.QPushButton_focus_finding = cw.PushButtonWidget('Find Focus')
         self.QPushButton_focus_locking = cw.PushButtonWidget('Lock Focus', checkable=True)
@@ -659,7 +659,7 @@ class ConWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def create_new_galvo_preset(self):
-        new_preset_name = self.new_preset_name.text().strip()
+        new_preset_name = self.QLineEdit_new_galvo_scan_preset.text().strip()
         if new_preset_name and new_preset_name not in self.galvo_scan_presets:
             self.galvo_scan_presets[new_preset_name] = {
                 "QDoubleSpinBox_galvo_x": self.QDoubleSpinBox_galvo_x.value(),
@@ -684,7 +684,7 @@ class ConWidget(QtWidgets.QWidget):
             self.config.write_config(self.galvo_scan_presets, self.config.configs["Galvo Scan Presets"])
             self.QComboBox_galvo_scan_presets.addItem(new_preset_name)
             self.QComboBox_galvo_scan_presets.setCurrentText(new_preset_name)
-            self.new_preset_name.clear()
+            self.QLineEdit_new_galvo_scan_preset.clear()
 
     @QtCore.pyqtSlot(bool)
     def set_laser_488_0(self, checked: bool):

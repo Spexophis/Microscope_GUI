@@ -120,6 +120,7 @@ class MainController(QtCore.QObject):
         self.v.ao_view.Signal_load_dm.connect(self.load_dm)
         self.v.ao_view.Signal_update_cmd.connect(self.update_dm)
         self.v.ao_view.Signal_save_dm.connect(self.save_dm)
+        self.v.ao_view.Signal_set_dm_flat.connect(self.set_dm_flat)
         self.v.ao_view.Signal_influence_function.connect(self.run_influence_function)
         # WFS
         self.v.ao_view.Signal_img_shwfs_base.connect(self.set_reference_wf)
@@ -1159,6 +1160,11 @@ class MainController(QtCore.QObject):
             self.logg.error(f"DM Error: {e}")
 
     @QtCore.pyqtSlot()
+    def set_dm_flat(self):
+        if int(self.ao_controller.get_cmd_index()) == self.dfm.current_cmd:
+            self.dfm.write_flat_cmd(t=time.strftime("%Y_%m_%d_%H_%M"), cmd=self.dfm.dm_cmd[self.dfm.current_cmd])
+
+    @QtCore.pyqtSlot()
     def update_dm(self):
         try:
             self.dfm.dm_cmd.append(self.dfm.temp_cmd[-1])
@@ -1398,9 +1404,9 @@ class MainController(QtCore.QObject):
             self.finish_influence_function()
             return
         try:
-            md = self.ao_controller.get_img_wfs_method()
             self.v.dialog_text.setText(f"computing influence function")
-            self.p.shwfsr.generate_influence_matrix(data_folder=fd, dm=self.dfm, method=md, sv=True)
+            dmn = self.v.ao_view.QComboBox_dms.currentText()
+            self.p.shwfsr.generate_influence_matrices(data_folder=fd, dm=self.dfm, sv=self.config)
         except Exception as e:
             self.logg.error(f"Error computing influence function: {e}")
             self.finish_influence_function()

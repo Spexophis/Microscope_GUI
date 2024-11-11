@@ -16,6 +16,7 @@ class AOWidget(QtWidgets.QWidget):
     Signal_influence_function = QtCore.pyqtSignal()
     Signal_set_zernike = QtCore.pyqtSignal()
     Signal_set_dm = QtCore.pyqtSignal()
+    Signal_set_dm_flat = QtCore.pyqtSignal()
     Signal_update_cmd = QtCore.pyqtSignal()
     Signal_load_dm = QtCore.pyqtSignal()
     Signal_save_dm = QtCore.pyqtSignal()
@@ -187,6 +188,7 @@ class AOWidget(QtWidgets.QWidget):
         self.QPushButton_load_dm = cw.PushButtonWidget('Load DM')
         self.QPushButton_update_cmd = cw.PushButtonWidget('Add DM')
         self.QPushButton_save_dm = cw.PushButtonWidget('Save DM')
+        self.QPushButton_change_dm_flat = cw.PushButtonWidget('Save Flat')
 
         layout_deformablemirror.addWidget(cw.LabelWidget(str('DM')), 0, 0, 1, 1)
         layout_deformablemirror.addWidget(self.QComboBox_dms, 0, 1, 1, 1)
@@ -207,7 +209,7 @@ class AOWidget(QtWidgets.QWidget):
         layout_deformablemirror.addWidget(self.QPushButton_setDM, 4, 1, 1, 1)
         layout_deformablemirror.addWidget(self.QPushButton_load_dm, 3, 3, 1, 1)
         layout_deformablemirror.addWidget(self.QPushButton_update_cmd, 4, 2, 1, 1)
-        layout_deformablemirror.addWidget(self.QPushButton_save_dm, 4, 3, 1, 1)
+        layout_deformablemirror.addWidget(self.QPushButton_change_dm_flat, 4, 3, 1, 1)
         return layout_deformablemirror
 
     def _create_dwfs_widgets(self):
@@ -276,6 +278,7 @@ class AOWidget(QtWidgets.QWidget):
         self.QPushButton_update_cmd.clicked.connect(self.update_dm_cmd)
         self.QPushButton_load_dm.clicked.connect(self.load_dm_file)
         self.QPushButton_save_dm.clicked.connect(self.save_dm_cmd)
+        self.QPushButton_change_dm_flat.clicked.connect(self.change_dm_flat)
         self.QPushButton_dwfs_cl_correction.clicked.connect(self.run_close_loop_correction)
         self.QPushButton_sensorless_run.clicked.connect(self.run_sensorless_correction)
         self.QPushButton_sensorless_auto.clicked.connect(self.run_sensorless_auto)
@@ -346,6 +349,10 @@ class AOWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def update_dm_cmd(self):
         self.Signal_update_cmd.emit()
+
+    @QtCore.pyqtSlot()
+    def change_dm_flat(self):
+        self.Signal_set_dm_flat.emit()
 
     @QtCore.pyqtSlot()
     def load_dm_file(self):

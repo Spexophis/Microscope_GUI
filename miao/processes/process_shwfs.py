@@ -5,7 +5,10 @@ import numpy as np
 import tifffile as tf
 from scipy.signal import fftconvolve as corr
 from skimage.filters import threshold_otsu
+
 from miao.tools import tool_improc as ipr
+from miao.tools import tool_zernike as tz
+
 fft2 = np.fft.fft2
 ifft2 = np.fft.ifft2
 fftshift = np.fft.fftshift
@@ -78,6 +81,11 @@ class WavefrontSensing:
 
     def wavefront_reconstruction(self, md='correlation', rt=False):
         (gradx, grady) = self.get_gradient_xy(mtd=md)
+        self.wf = self.gradient_to_wavefront(gradx, grady)
+        if rt:
+            return self.wf
+
+    def gradient_to_wavefront(self, gradx, grady):
         gradx = np.pad(gradx, ((1, 1), (1, 1)), 'constant')
         grady = np.pad(grady, ((1, 1), (1, 1)), 'constant')
         extx, exty = self._hudgins_extend_mask(gradx, grady)
@@ -86,9 +94,7 @@ class WavefrontSensing:
         msk = self._elliptical_mask((self.n_lenslets_y / 2, self.n_lenslets_x / 2),
                                     (self.n_lenslets_y + 2, self.n_lenslets_x + 2))
         phicorr = phicorr * msk
-        self.wf = phicorr[1:1 + self.n_lenslets_y, 1:1 + self.n_lenslets_x]
-        if rt:
-            return self.wf
+        return phicorr[1:1 + self.n_lenslets_y, 1:1 + self.n_lenslets_x]
 
     def get_gradient_xy(self, mtd='correlation'):
         """ Determines Gradients by Correlating each section with its base reference section"""
@@ -225,19 +231,16 @@ class WavefrontSensing:
         y -= size[1] / 2.
         return (x * x / (radius[0] * radius[0])) + (y * y / (radius[1] * radius[1])) <= 1
 
-    def generate_influence_matrix(self, data_folder, dm, method='phase', sv=False, verbose=False):
+    def generate_influence_matrices(self, data_folder, dm, sv=None, verbose=False):
         n_actuators, amp = dm.n_actuator, dm.amp
-        if method == 'phase':
-            _influence_matrix = np.zeros((self.n_lenslets, n_actuators))
-            wfs = np.zeros((n_actuators, self.n_lenslets_y, self.n_lenslets_x))
-        elif method == 'zonal':
-            _influence_matrix = np.zeros((2 * self.n_lenslets, n_actuators))
-        elif method == 'modal':
-            _influence_matrix = np.zeros((dm.n_zernike, n_actuators))
-        else:
-            raise ValueError("Invalid method")
-        _msk = self._elliptical_mask((self.n_lenslets_y / 2, self.n_lenslets_x / 2),
-                                     (self.n_lenslets_y, self.n_lenslets_x))
+        dm.nly, dm.nlx = self.n_lenslets_y, self.n_lenslets_x
+        dm.nls = self.n_lenslets_y * self.n_lenslets_x
+        dm.zernike = tz.zernike_polynomials(size=[self.n_lenslets_y, self.n_lenslets_x])
+        dm.zslopes = tz.zernike_derivatives(size=[self.n_lenslets_y, self.n_lenslets_x])
+        influence_matrix_phase = np.zeros((self.n_lenslets, n_actuators))
+        wfs_phase = np.zeros((n_actuators, self.n_lenslets_y, self.n_lenslets_x))
+        influence_matrix_zonal = np.zeros((2 * self.n_lenslets, n_actuators))
+        influence_matrix_modal = np.zeros((dm.n_zernike, n_actuators))
         for filename in os.listdir(data_folder):
             if filename.endswith(".tif") & filename.startswith("actuator"):
                 ind = int(filename.split("_")[1])
@@ -247,37 +250,54 @@ class WavefrontSensing:
                 n, x, y = data_stack.shape
                 if n != 4:
                     raise "The image number has to be 4"
-                if method == 'phase':
-                    self.ref, self.meas = data_stack[0], data_stack[1]
-                    wfp = self.wavefront_reconstruction(rt=True)
-                    self.ref, self.meas = data_stack[2], data_stack[3]
-                    wfn = self.wavefront_reconstruction(rt=True)
-                    msk = (wfp != 0.0).astype(np.float32)
-                    mn = wfp.sum() / msk.sum()
-                    wfp = msk * (wfp - mn)
-                    msk = (wfn != 0.0).astype(np.float32)
-                    mn = wfn.sum() / msk.sum()
-                    wfn = msk * (wfn - mn)
-                    wfg = (wfp - wfn) / (2 * amp)
-                    wfs[ind] = wfg
-                    _influence_matrix[:, ind] = wfg.reshape(self.n_lenslets)
-                else:
-                    self.ref, self.meas = data_stack[0], data_stack[1]
-                    gdxp, gdyp = self.get_gradient_xy()
-                    self.ref, self.meas = data_stack[2], data_stack[3]
-                    gdxn, gdyn = self.get_gradient_xy()
-                    if method == 'zonal':
-                        _influence_matrix[:self.n_lenslets, ind] = ((gdxp - gdxn) / (2 * amp)).reshape(self.n_lenslets)
-                        _influence_matrix[self.n_lenslets:, ind] = ((gdyp - gdyn) / (2 * amp)).reshape(self.n_lenslets)
-                    if method == 'modal':
-                        a1 = ipr.get_eigen_coefficients(np.concatenate((gdxp.flatten(), gdyp.flatten())), dm.zslopes, 14)
-                        a2 = ipr.get_eigen_coefficients(np.concatenate((gdxn.flatten(), gdyn.flatten())), dm.zslopes, 14)
-                        _influence_matrix[:, ind] = ((a1 - a2) / (2 * amp)).flatten()
-        _control_matrix = ipr.pseudo_inverse(_influence_matrix, n=14)
-        if sv:
-            t = time.strftime("%Y%m%d")
-            tf.imwrite(os.path.join(data_folder, f"influence_function_{method}_{t}.tif"), _influence_matrix)
-            tf.imwrite(os.path.join(data_folder, f"control_matrix_{method}_{t}.tif"), _control_matrix)
-            if 'wfs' in locals():
-                if isinstance(wfs, np.ndarray):
-                    tf.imwrite(os.path.join(data_folder, f"influence_function_images_{t}.tif"), wfs)
+                self.ref, self.meas = data_stack[0], data_stack[1]
+                gdxp, gdyp = self.get_gradient_xy()
+                wfp = self.gradient_to_wavefront(gdxp, gdyp)
+                self.ref, self.meas = data_stack[2], data_stack[3]
+                gdxn, gdyn = self.get_gradient_xy()
+                wfn = self.gradient_to_wavefront(gdxn, gdyn)
+                # phase
+                msk = (wfp != 0.0).astype(np.float32)
+                mn = wfp.sum() / msk.sum()
+                wfp = msk * (wfp - mn)
+                msk = (wfn != 0.0).astype(np.float32)
+                mn = wfn.sum() / msk.sum()
+                wfn = msk * (wfn - mn)
+                wfg = (wfp - wfn) / (2 * amp)
+                wfs_phase[ind] = wfg
+                influence_matrix_phase[:, ind] = wfg.reshape(self.n_lenslets)
+                # zonal
+                influence_matrix_zonal[:self.n_lenslets, ind] = ((gdxp - gdxn) / (2 * amp)).reshape(self.n_lenslets)
+                influence_matrix_zonal[self.n_lenslets:, ind] = ((gdyp - gdyn) / (2 * amp)).reshape(self.n_lenslets)
+                # modal
+                a1 = ipr.get_eigen_coefficients(np.concatenate((gdxp.flatten(), gdyp.flatten())), dm.zslopes, 14)
+                a2 = ipr.get_eigen_coefficients(np.concatenate((gdxn.flatten(), gdyn.flatten())), dm.zslopes, 14)
+                influence_matrix_modal[:, ind] = ((a1 - a2) / (2 * amp)).flatten()
+        control_matrix_phase = ipr.pseudo_inverse(influence_matrix_phase, n=14)
+        control_matrix_zonal = ipr.pseudo_inverse(influence_matrix_zonal, n=14)
+        control_matrix_modal = ipr.pseudo_inverse(influence_matrix_modal, n=14)
+        if sv is not None:
+            fd = sv.configs["Adaptive Optics"]["Deformable Mirrors"][dm.dm_name]["Calibration File Folder"]
+            t = time.strftime("%Y_%m_%d_%H_%M")
+            fn = os.path.join(fd, f"influence_function_phase_{t}.tif")
+            tf.imwrite(fn, influence_matrix_phase)
+            fn = os.path.join(fd, f"control_matrix_phase_{t}.tif")
+            tf.imwrite(fn, control_matrix_phase)
+            dm.control_matrix_phase = control_matrix_phase
+            sv.configs["Adaptive Optics"]["Deformable Mirrors"][dm.dm_name]["Phase Control Matrix"] = fn
+            fn = os.path.join(fd, f"influence_function_images_{t}.tif")
+            tf.imwrite(fn, wfs_phase)
+            sv.configs["Adaptive Optics"]["Deformable Mirrors"][dm.dm_name]["Influence Function Images"] = fn
+            fn = os.path.join(fd, f"influence_function_zonal_{t}.tif")
+            tf.imwrite(fn, influence_matrix_zonal)
+            fn = os.path.join(fd, f"control_matrix_zonal_{t}.tif")
+            tf.imwrite(fn, control_matrix_zonal)
+            dm.control_matrix_zonal = control_matrix_zonal
+            sv.configs["Adaptive Optics"]["Deformable Mirrors"][dm.dm_name]["Zonal Control Matrix"] = fn
+            fn = os.path.join(fd, f"influence_function_modal_{t}.tif")
+            tf.imwrite(fn, influence_matrix_modal)
+            fn = os.path.join(fd, f"control_matrix_modal_{t}.tif")
+            tf.imwrite(fn, control_matrix_modal)
+            dm.control_matrix_modal = control_matrix_modal
+            sv.configs["Adaptive Optics"]["Deformable Mirrors"][dm.dm_name]["Modal Control Matrix"] = fn
+            sv.write_config(sv.configs, sv.cfd)

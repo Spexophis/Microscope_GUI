@@ -254,7 +254,7 @@ class HamamatsuCamera(object):
     class CameraSettings:
         def __init__(self):
             self.t_clean = 0
-            self.t_readout = 0.004
+            self.t_readout = 0.002
             self.t_exposure = 0
             self.t_accumulate = 0
             self.t_kinetic = 0
