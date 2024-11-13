@@ -409,21 +409,18 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
-        galvo_positions, galvo_ranges, dot_pos, galvo_positions_act, galvo_ranges_act, dot_pos_act, sws = self.con_controller.get_galvo_scan_parameters()
-        self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges, foci=dot_pos,
+        galvo_positions, galvo_ranges, dot_pos, offset, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act, sws = self.con_controller.get_galvo_scan_parameters()
+        self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges,
+                                                    foci=dot_pos, offsets=offset,
                                                     origins_act=galvo_positions_act, ranges_act=galvo_ranges_act,
-                                                    foci_act=dot_pos_act, sws=sws)
+                                                    foci_act=dot_pos_act, offsets_act=offset_act, sws=sws)
         self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
 
     def update_trigger_parameters(self, cam_key):
         try:
             digital_starts, digital_ends = self.con_controller.get_digital_parameters()
             self.p.trigger.update_digital_parameters(digital_starts, digital_ends)
-            galvo_positions, galvo_ranges, dot_pos, galvo_positions_act, galvo_ranges_act, dot_pos_act, sws = self.con_controller.get_galvo_scan_parameters()
-            self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges, foci=dot_pos,
-                                                        origins_act=galvo_positions_act, ranges_act=galvo_ranges_act,
-                                                        foci_act=dot_pos_act, sws=sws)
-            self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
+            self.update_galvo_scanner()
             axis_lengths, step_sizes = self.con_controller.get_piezo_scan_parameters()
             pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
             positions = [pos_x[1], pos_y[1], pos_z[1]]

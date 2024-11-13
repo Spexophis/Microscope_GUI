@@ -126,15 +126,18 @@ class ConController:
                         [self.v.QDoubleSpinBox_dot_range_x.value(), self.v.QDoubleSpinBox_dot_range_y.value()]]
         dot_pos = [self.v.QSpinBox_dot_step_x.value(), self.v.QDoubleSpinBox_dot_step_x.value(),
                    self.v.QDoubleSpinBox_dot_step_y.value()]
+        offsets = [self.v.QDoubleSpinBox_galvo_offset_x.value(), self.v.QDoubleSpinBox_galvo_offset_y.value()]
         galvo_positions_act = [self.v.QDoubleSpinBox_galvo_x_act.value(), self.v.QDoubleSpinBox_galvo_y_act.value()]
         galvo_ranges_act = [
             [self.v.QDoubleSpinBox_galvo_range_x_act.value(), self.v.QDoubleSpinBox_galvo_range_y_act.value()],
             [self.v.QDoubleSpinBox_dot_range_x_act.value(), self.v.QDoubleSpinBox_dot_range_y_act.value()]]
         dot_pos_act = [self.v.QSpinBox_dot_step_x_act.value(), self.v.QDoubleSpinBox_dot_step_x_act.value(),
                        self.v.QDoubleSpinBox_dot_step_y_act.value()]
+        offsets_act = [self.v.QDoubleSpinBox_galvo_offset_x_act.value(), self.v.QDoubleSpinBox_galvo_offset_y_act.value()]
         sws = [self.v.QDoubleSpinBox_emccd_gvs.value(), self.v.QDoubleSpinBox_scmos_gvs.value(),
                self.v.QDoubleSpinBox_thorcam_gvs.value()]
-        return galvo_positions, galvo_ranges, dot_pos, galvo_positions_act, galvo_ranges_act, dot_pos_act, sws
+        return (galvo_positions, galvo_ranges, dot_pos, offsets,
+                galvo_positions_act, galvo_ranges_act, dot_pos_act, offsets_act, sws)
 
     def change_galvo_scan(self, x=None, y=None):
         if x is not None:
