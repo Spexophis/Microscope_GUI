@@ -133,6 +133,7 @@ class MainController(QtCore.QObject):
         self.v.ao_view.Signal_img_shwfs_correct_wf.connect(self.run_close_loop_correction)
         self.v.ao_view.Signal_sensorlessAO_run.connect(self.run_sensorless_iteration)
         self.v.ao_view.Signal_sensorlessAO_auto.connect(self.run_auto_sensorless)
+        self.v.ao_view.Signal_sensorlessAO_acquisition.connect(self.run_sensorless_acquisitions)
 
     def _initial_setup(self):
         try:
@@ -1622,6 +1623,68 @@ class MainController(QtCore.QObject):
     def run_sensorless_iteration(self):
         self.v.get_dialog()
         self.run_task(task=self.sensorless_iterations)
+
+    def sensorless_acquisitions(self):
+        try:
+            self.prepare_sensorless_iteration()
+        except Exception as e:
+            self.logg.error(f"Prepare sensorless iteration Error: {e}")
+            return
+        try:
+            lpr, hpr, mf = self.ao_controller.get_ao_parameters()
+            if mf == 'Mask(Intensity)':
+                msk = self.view_controller.get_image_data(7)
+            name = time.strftime("%Y%m%d_%H%M%S_") + '_sensorless_acquisitions_'
+            new_folder = os.path.join(self.data_folder, name)
+            os.makedirs(new_folder, exist_ok=True)
+            self.logg.info(f'Directory {new_folder} has been created successfully.')
+        except Exception as e:
+            self.logg.error(f'Error creating directory for sensorless iteration: {e}')
+            return
+        try:
+            mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
+            md = self.ao_controller.get_img_wfs_method()
+            amprange = [amp_start + step_number * amp_step for step_number in range(amp_step_number)]
+            cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
+            self.m.cam_set[self.cameras["imaging"]].start_live()
+            time.sleep(0.08)
+            self.logg.info("Automated sensorless AO iterations start")
+            self.dfm.set_dm(cmd)
+            time.sleep(0.016)
+            tpd = []
+            for _ in range(16):
+                self.m.daq.run_triggers()
+                time.sleep(0.032)
+                self.m.daq.stop_triggers(_close=False)
+                tpd.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
+            fn = new_folder + r"\original.tiff"
+            tf.imwrite(str(fn), np.asarray(tpd))
+            for mode in range(mode_start, mode_stop + 1):
+                self.v.dialog_text.setText(f"Zernike mode #{mode}")
+                for amp in amprange:
+                    label = "zm_%0.2d_amp_%.3f.tiff" % (mode, amp)
+                    cm = self.dfm.cmd_add(self.dfm.get_zernike_cmd(mode, amp, method=md), cmd)
+                    self.dfm.set_dm(cm)
+                    time.sleep(0.016)
+                    ims = []
+                    for _ in range(16):
+                        self.m.daq.run_triggers()
+                        time.sleep(0.032)
+                        self.m.daq.stop_triggers(_close=False)
+                        ims.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
+                    fn = os.path.join(str(new_folder), label)
+                    tf.imwrite(str(fn), np.asarray(ims))
+            self.dfm.set_dm(cmd)
+        except Exception as e:
+            self.finish_sensorless_iteration()
+            self.logg.error(f"Sensorless AO Error: {e}")
+            return
+        self.finish_sensorless_iteration()
+
+    @QtCore.pyqtSlot()
+    def run_sensorless_acquisitions(self):
+        self.v.get_dialog()
+        self.run_task(task=self.sensorless_acquisitions)
 
     def auto_sensorless(self):
         self.loop_flag = True
