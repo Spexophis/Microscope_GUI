@@ -167,14 +167,6 @@ class ImageReconstruction:
             periods.append(period)
         return periods, normalized_spectrum, sorted_peaks[1:5]
 
-    def fft_frequency_map(self, rows, cols):
-        freq_x = np.fft.fftfreq(cols, self.pixel_size_x)
-        freq_y = np.fft.fftfreq(rows, self.pixel_size_y)
-        fx, fy = np.meshgrid(freq_x, freq_y)
-        fxy = np.sqrt(fx ** 2 + fy ** 2)
-        frequency_map = np.divide(1.0, fxy, where=fxy != 0, out=np.zeros_like(fxy))
-        return fftshift(frequency_map)
-
 
 def fit_gaussian_2d(image, bounds=None):
     def gaussian_beam(r, bg, I0, r0, w0):

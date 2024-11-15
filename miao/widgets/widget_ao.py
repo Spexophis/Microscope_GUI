@@ -234,10 +234,12 @@ class AOWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_lpf = cw.DoubleSpinBoxWidget(0, 1, 0.05, 2, 0.1)
         self.QDoubleSpinBox_hpf = cw.DoubleSpinBoxWidget(0, 1, 0.05, 2, 0.6)
         self.QComboBox_metric = cw.ComboBoxWidget(list_items=['Max(Intensity)', 'Sum(Intensity)', 'Mask(Intensity)',
-                                                              'SNR(FFT)', 'HighPass(FFT)'])
+                                                              'SNR(FFT)', 'HighPass(FFT)', 'Selected(FFT)'])
+        self.QDoubleSpinBox_select_frequency = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 1.410)
         self.QPushButton_sensorless_run = cw.PushButtonWidget('Run AO')
         self.QPushButton_sensorless_auto = cw.PushButtonWidget('Auto AO')
         self.QPushButton_sensorless_acqs = cw.PushButtonWidget('Run ACQs')
+        self.QRadioButton_sensorless_error = cw.RadioButtonWidget('ErrorIn')
 
         layout_sensorless.addWidget(cw.LabelWidget(str('Zernike Modes')), 0, 0, 1, 2)
         layout_sensorless.addWidget(cw.LabelWidget(str('From')), 1, 0, 1, 1)
@@ -255,10 +257,13 @@ class AOWidget(QtWidgets.QWidget):
         layout_sensorless.addWidget(self.QDoubleSpinBox_lpf, 1, 4, 1, 1)
         layout_sensorless.addWidget(cw.LabelWidget(str('HPF')), 2, 4, 1, 1)
         layout_sensorless.addWidget(self.QDoubleSpinBox_hpf, 3, 4, 1, 1)
+        layout_sensorless.addWidget(cw.LabelWidget(str('Select')), 4, 4, 1, 1)
+        layout_sensorless.addWidget(self.QDoubleSpinBox_select_frequency, 5, 4, 1, 1)
         layout_sensorless.addWidget(cw.LabelWidget(str('Image Metric')), 0, 5, 1, 1)
         layout_sensorless.addWidget(self.QComboBox_metric, 1, 5, 1, 1)
-        layout_sensorless.addWidget(self.QPushButton_sensorless_run, 2, 5, 1, 1)
-        layout_sensorless.addWidget(self.QPushButton_sensorless_auto, 3, 5, 1, 1)
+        layout_sensorless.addWidget(self.QRadioButton_sensorless_error, 2, 5, 1, 1)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_run, 3, 5, 1, 1)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_auto, 4, 5, 1, 1)
         layout_sensorless.addWidget(self.QPushButton_sensorless_acqs, 3, 0, 1, 2)
         return layout_sensorless
 

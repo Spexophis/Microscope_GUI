@@ -141,7 +141,42 @@ def gaussian_filter(shape, sigma, pv, orig=None):
     return pv * g
 
 
-def snr(img, lpr, hpr, gau=False):
+def fft_frequency_2dmap(rows, cols, psy, psx):
+    freq_x = np.fft.fftfreq(cols, psx)
+    freq_y = np.fft.fftfreq(rows, psy)
+    fx, fy = np.meshgrid(freq_x, freq_y)
+    fxy = np.sqrt(fx ** 2 + fy ** 2)
+    frequency_map = np.divide(1.0, fxy, where=fxy != 0, out=np.zeros_like(fxy))
+    return fftshift(frequency_map)
+
+
+def selected_frequency(img, freqs, relative=True):
+    _ny, _nx = img.shape
+    df = fs / _nx
+    radius = (na / wl) / df
+    freq_x = fftshift(np.fft.fftfreq(_nx, dx))
+    freq_y = fftshift(np.fft.fftfreq(_ny, dx))
+    freq_x = np.divide(1.0, freq_x, where=freq_x != 0, out=np.zeros_like(freq_x))
+    freq_y = np.divide(1.0, freq_y, where=freq_y != 0, out=np.zeros_like(freq_y))
+    freq_coords = []
+    for freq in freqs:
+        horizontal_indices = np.argsort(np.abs(freq_x - freq))[:2]
+        horizontal_coords = [(x, _ny // 2) for x in horizontal_indices]
+        vertical_indices = np.argsort(np.abs(freq_y - freq))[:2]
+        vertical_coords = [(_nx // 2, y) for y in vertical_indices]
+        freq_coords += horizontal_coords + vertical_coords
+    msk = disc_array(shape=(_ny, _nx), radi=0.9 * radius)
+    g = np.zeros((_ny, _nx))
+    for freq_coord in freq_coords:
+        g += disc_array(shape=(_ny, _nx), radi=9, origin=freq_coord)
+    wft = np.fft.fftshift(np.fft.fft2(img))
+    if relative:
+        return (np.abs(wft * g)).sum() / (np.abs(wft * msk)).sum()
+    else:
+        return (np.abs(wft * g)).sum()
+
+
+def snr(img, lpr, hpr, relative=True, gau=True):
     _ny, _nx = img.shape
     df = fs / _nx
     radius = (na / wl) / df
@@ -152,8 +187,13 @@ def snr(img, lpr, hpr, gau=False):
     else:
         lp = disc_array(shape=(_nx, _ny), radi=lpr * radius)
         hp = msk - disc_array(shape=(_nx, _ny), radi=hpr * radius)
-    aft = np.fft.fftshift(np.fft.fft2(img))
-    return (np.abs(hp * aft)).sum() / (np.abs(lp * aft)).sum()
+    wft = np.fft.fftshift(np.fft.fft2(img))
+    if relative:
+        num = (np.abs(hp * wft)).sum() / (np.abs(wft * msk)).sum()
+        den = (np.abs(lp * wft)).sum() / (np.abs(wft * msk)).sum()
+        return num / den
+    else:
+        return (np.abs(hp * wft)).sum() / (np.abs(lp * wft)).sum()
 
 
 def hpf(img, hpr, relative=True, gau=True):
@@ -165,36 +205,47 @@ def hpf(img, hpr, relative=True, gau=True):
         hp = (1 - gaussian_filter(shape=(_nx, _ny), sigma=hpr * radius, pv=1, orig=None)) * msk
     else:
         hp = msk - disc_array(shape=(_nx, _ny), radi=hpr * radius)
-    aft = np.fft.fftshift(np.fft.fft2(img))
-    aft = aft * hp
+    wft = np.fft.fftshift(np.fft.fft2(img))
     if relative:
-        wft = np.fft.fftshift(np.fft.fft2(img))
-        return (np.abs(aft)).sum() / (np.abs(wft)).sum()
+        return (np.abs(wft * hp)).sum() / (np.abs(wft * msk)).sum()
     else:
-        return (np.abs(aft)).sum()
+        return (np.abs(wft * hp)).sum()
 
 
 def binomial_model(x, a, b, c):
     return a * x**2 + b * x + c
 
 
-def peak_find(x, y, sigma_=0):
-    x = np.asarray(x)
-    y = np.asarray(y)
-    if sigma_:
-        popt, pcov = curve_fit(binomial_model, x, y, sigma=np.full_like(y, sigma_))
-        a, b, c = popt
+def peak_find(x_data, y_data, y_std=None):
+    x = np.asarray(x_data)
+    y = np.asarray(y_data)
+    if y_std is not None:
+        y_err = np.asarray(y_std)
+        p_opt, p_cov = curve_fit(binomial_model, x, y, sigma=y_err, absolute_sigma=True)
+        a, b, c = p_opt
+        x_peak = -b / (2 * a)
+        if a > 0:
+            return "No peak"
+        elif x_peak >= x.max():
+            return "Peak above maximum"
+        elif x_peak <= x.min():
+            return "Peak below minimum"
+        else:
+            sigma_a, sigma_b, sigma_c = np.sqrt(np.diag(p_cov))
+            x_peak_err = np.sqrt((b / (2 * a ** 2) * sigma_a) ** 2 + (-1 / (2 * a) * sigma_b) ** 2)
+            print(x_peak_err)
+            return x_peak
     else:
         a, b, c = np.polyfit(x, y, 2)
-    p = -1 * b / a / 2.0
-    if a > 0:
-        return "No peak"
-    elif p >= x.max():
-        return "Peak above maximum"
-    elif p <= x.min():
-        return "Peak below minimum"
-    else:
-        return p
+        x_peak = -b / (2 * a)
+        if a > 0:
+            return "No peak"
+        elif x_peak >= x.max():
+            return "Peak above maximum"
+        elif x_peak <= x.min():
+            return "Peak below minimum"
+        else:
+            return x_peak
 
 
 def valley_find(x, y):
