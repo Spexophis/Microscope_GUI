@@ -448,6 +448,8 @@ class TriggerSequence:
                                                                                          cam_sw,
                                                                                          self.galvo_sw_settle_samples)
                 switch_galvo_act[-fill_samples_act_a:] = self.galvo_sw_states[2]
+        else:
+            pass
         # offset ramp
         ramp_up_offset = np.linspace(0, self.galvo_offsets[0], self.ramp_up_samples + 1, dtype=np.float16,
                                      endpoint=True)
@@ -475,8 +477,8 @@ class TriggerSequence:
         laser_trigger = np.concatenate((np.zeros(square_wave.size), laser_trigger))
         camera_trigger = np.zeros(laser_trigger.shape, dtype=np.int8)
         camera_trigger[self.samples_delay + square_wave.size: - self.samples_offset - self.ramp_down_samples] = 1
-        tl = self.samples_delay - square_wave.size - self.samples_offset - self.ramp_down_samples
-        self.exposure_samples = camera_trigger.shape[0] - tl
+        self.exposure_samples = camera_trigger.shape[
+                                    0] - self.samples_delay - square_wave.size - self.samples_offset - self.ramp_down_samples
         self.exposure_time = self.exposure_samples / self.sample_rate
         fill_samples_b = max(self.galvo_sw_settle_samples, self.galvo_return)
         fill_samples_a = max(self.standby_samples, self.galvo_sw_settle_samples)
