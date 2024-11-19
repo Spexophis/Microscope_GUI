@@ -34,9 +34,9 @@ class TriggerSequence:
             self.galvo_sw_settle_samples = int(np.ceil(self.galvo_sw_settle * self.sample_rate))
             self.galvo_sw_states = [4., -2., 0.]
             # galvo scanner
-            self.galvo_step_response = int(32e-4 * self.sample_rate)  # ~320 us
+            self.galvo_step_response = int(3.2e-4 * self.sample_rate)  # ~320 us
             self.galvo_return = int(8e-4 * self.sample_rate)  # ~800 us
-            self.ramp_down_fraction = 0.016
+            self.ramp_down_fraction = 0.02
             self.ramp_down_offset = 20  # samples
             # galvo scan for read out
             self.galvo_origins = [0.0, 0.0]  # V
@@ -377,8 +377,7 @@ class TriggerSequence:
             ramp_offset_act = np.concatenate((ramp_up_offset_act, ramp_down_offset_act))
             slow_axis_offset_act = np.tile(ramp_offset_act, self.dot_pos_act.size)
             # galvo activation
-            ramp_down_act = np.linspace(self.ramp_up_act[-1], self.ramp_up_act[0], num=self.ramp_down_samples_act,
-                                        endpoint=True)
+            ramp_down_act = smooth_ramp(self.ramp_up_act[-1], self.ramp_up_act[0], self.ramp_down_samples_act)
             extended_cycle_act = np.concatenate((self.ramp_up_act, ramp_down_act))
             fast_axis_galvo_act = np.tile(extended_cycle_act, self.dot_pos_act.size)
             fast_axis_offset_act = np.linspace(0, self.galvo_offsets_act[1], fast_axis_galvo_act.size,
@@ -425,8 +424,6 @@ class TriggerSequence:
                 tl = self.samples_delay_act + self.galvo_sw_settle_samples + self.galvo_return
                 self.exposure_samples = camera_trigger_act.shape[0] - tl
                 self.exposure_time = self.exposure_samples / self.sample_rate
-        else:
-            pass
         # offset ramp
         ramp_up_offset = np.linspace(0, self.galvo_offsets[0], self.ramp_up_samples + 1, dtype=np.float16,
                                      endpoint=True)
@@ -434,7 +431,7 @@ class TriggerSequence:
         ramp_offset = np.concatenate((ramp_up_offset, ramp_down_offset))
         slow_axis_offset = np.tile(ramp_offset, self.dot_pos.size)
         # galvo read out
-        ramp_down = np.linspace(self.ramp_up[-1], self.ramp_up[0], num=self.ramp_down_samples, endpoint=True)
+        ramp_down = smooth_ramp(self.ramp_up[-1], self.ramp_up[0], self.ramp_down_samples)
         extended_cycle = np.concatenate((self.ramp_up, ramp_down))
         fast_axis_galvo = np.tile(extended_cycle, self.dot_pos.size)
         fast_axis_offset = np.linspace(0, self.galvo_offsets[1], fast_axis_galvo.size, dtype=np.float16,
@@ -545,7 +542,6 @@ class TriggerSequence:
             square_wave_up_act = np.pad(np.tile(_sqr_act, self.dot_pos_act.size),
                                         (self.samples_delay_act, self.samples_offset_act), 'constant',
                                         constant_values=(0, 0))
-
             square_wave_down_act = np.pad(np.tile(_sqr_act, self.dot_pos_act.size),
                                           (self.samples_delay_act + self.ramp_down_offset,
                                            self.samples_offset_act - self.ramp_down_offset),
