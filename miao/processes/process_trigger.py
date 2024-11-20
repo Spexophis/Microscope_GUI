@@ -43,18 +43,16 @@ class TriggerSequence:
             self.galvo_ranges = [1.0, 1.0]  # V
             self.galvo_offsets = [0.008, 0.008]  # V
             self.galvo_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
-            self.galvo_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
-            # dot array for read out
             self.dot_ranges = [0.8, 0.8]  # V
+            self.galvo_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
             self.dot_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
-            self.dot_step_s = 41  # samples
+            self.dot_step_s = 51  # samples
             self.dot_step_v = 0.0186  # volts
             self.dot_step_y = 0.0186  # volts
             self.up_rate = self.dot_step_v / self.dot_step_s
-            self.dot_pos = np.arange(self.dot_starts[0], self.dot_starts[0] + self.dot_ranges[0] + self.dot_step_v,
-                                     self.dot_step_v)
+            self.dot_pos = np.arange(self.dot_starts[0], self.galvo_stops[0], self.dot_step_v)
             # sawtooth wave for read out
-            self.ramp_up = np.arange(self.galvo_starts[0], self.galvo_stops[0], self.up_rate)
+            self.ramp_up = np.arange(self.galvo_starts[0], self.galvo_stops[0] + self.dot_step_v, self.up_rate)
             self.ramp_up_samples = self.ramp_up.size
             self.ramp_down_samples = int(np.ceil(self.ramp_up_samples * self.ramp_down_fraction))
             self.frequency = int(self.sample_rate / self.ramp_up_samples)  # Hz
@@ -62,25 +60,23 @@ class TriggerSequence:
             self.samples_high = 1
             self.samples_low = self.dot_step_s - self.samples_high
             self.samples_delay = int(np.abs(self.dot_starts[0] - self.galvo_starts[0]) / self.up_rate)
-            self.samples_offset = self.ramp_up_samples - self.samples_delay - self.dot_step_s * self.dot_pos.size
+            self.samples_offset = self.ramp_up_samples - (self.samples_delay + self.dot_step_s * self.dot_pos.size)
             # galvo scan for activation
             self.galvo_origins_act = [0.00, 0.00]  # V
             self.galvo_ranges_act = [1.0, 1.0]  # V
             self.galvo_offsets_act = [0.008, 0.008]  # V
             self.galvo_starts_act = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.galvo_ranges_act)]
-            self.galvo_stops_act = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.galvo_ranges_act)]
-            # dot array for activation
             self.dot_ranges_act = [0.8, 0.8]  # V
+            self.galvo_stops_act = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.dot_ranges_act)]
             self.dot_starts_act = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.dot_ranges_act)]
             self.dot_step_s_act = 41  # samples
-            self.dot_step_v_act = 0.018  # volts
-            self.dot_step_y_act = 0.018  # volts
+            self.dot_step_v_act = 0.0185  # volts
+            self.dot_step_y_act = 0.0185  # volts
             self.up_rate_act = self.dot_step_v_act / self.dot_step_s_act
-            self.dot_pos_act = np.arange(self.dot_starts_act[0],
-                                         self.dot_starts_act[0] + self.dot_ranges_act[0] + self.dot_step_v_act,
-                                         self.dot_step_v_act)
+            self.dot_pos_act = np.arange(self.dot_starts_act[0], self.galvo_stops_act[0], self.dot_step_v_act)
             # sawtooth wave for activation
-            self.ramp_up_act = np.arange(self.galvo_starts_act[0], self.galvo_stops_act[0], self.up_rate_act)
+            self.ramp_up_act = np.arange(self.galvo_starts_act[0], self.galvo_stops_act[0] + self.dot_step_v_act,
+                                         self.up_rate_act)
             self.ramp_up_samples_act = self.ramp_up_act.size
             self.ramp_down_samples_act = int(np.ceil(self.ramp_up_samples_act * self.ramp_down_fraction))
             self.frequency_act = int(self.sample_rate / self.ramp_up_samples_act)  # Hz
@@ -315,55 +311,6 @@ class TriggerSequence:
         piezo_sequence = shift_array(piezo_sequence, max(self.standby_samples, self.return_samples),
                                      fill=piezo_sequence[0], direction="backward")
         return np.asarray(digital_sequences), switch_trigger, piezo_sequence, lasers, self.piezo_scan_pos[2]
-
-    def generate_galvo_scanning(self, g="activation"):
-        if g == "activation":
-            ramp_down_act = np.linspace(self.ramp_up_act[-1], self.ramp_up_act[0], num=self.ramp_down_samples_act,
-                                        endpoint=True)
-            extended_cycle_act = np.concatenate((self.ramp_up_act, ramp_down_act))
-            fast_axis_galvo_act = np.tile(extended_cycle_act, self.dot_pos_act.size)
-            slow_axis_galvo_act = np.zeros_like(fast_axis_galvo_act)
-            indices_act = np.arange(self.ramp_up_samples_act + 1, len(fast_axis_galvo_act), extended_cycle_act.size)
-            slow_axis_galvo_act[indices_act] = 1
-            slow_axis_galvo_act = np.cumsum(slow_axis_galvo_act) * self.dot_step_y_act + self.dot_starts_act[1]
-            slow_axis_galvo_act[-self.ramp_down_samples_act:] = np.linspace(
-                slow_axis_galvo_act[-self.ramp_down_samples_act], self.dot_starts_act[1], self.ramp_down_samples_act)
-            fill_samples_act = max(0, self.galvo_sw_settle_samples - (
-                    self.samples_offset_act + self.ramp_down_samples_act))
-            fast_axis_galvo_act = np.pad(fast_axis_galvo_act, (self.galvo_return, fill_samples_act), 'constant',
-                                         constant_values=(self.galvo_starts[0], self.galvo_starts[0]))
-            slow_axis_galvo_act = np.pad(slow_axis_galvo_act, (self.galvo_return, fill_samples_act), 'constant',
-                                         constant_values=(self.dot_starts_act[1], self.dot_starts_act[1]))
-            _sqr_act = np.pad(np.ones(self.samples_high_act), (0, self.samples_low_act), 'constant',
-                              constant_values=(0, 0))
-            square_wave_act = np.pad(np.tile(_sqr_act, self.dot_pos_act.size),
-                                     (self.samples_delay_act, self.samples_offset + self.ramp_down_samples), 'constant',
-                                     constant_values=(0, 0))
-            laser_trigger_act = np.tile(square_wave_act, self.dot_pos_act.size)
-            return fast_axis_galvo_act, slow_axis_galvo_act, laser_trigger_act
-        elif g == "readout":
-            ramp_down = np.linspace(self.ramp_up[-1], self.ramp_up[0], num=self.ramp_down_samples, endpoint=True)
-            extended_cycle = np.concatenate((self.ramp_up, ramp_down))
-            fast_axis_galvo = np.tile(extended_cycle, self.dot_pos.size)
-            slow_axis_galvo = np.zeros_like(fast_axis_galvo)
-            indices = np.arange(self.ramp_up_samples + 1, len(fast_axis_galvo), extended_cycle.size)
-            slow_axis_galvo[indices] = 1
-            slow_axis_galvo = np.cumsum(slow_axis_galvo) * self.dot_step_y + self.dot_starts[1]
-            slow_axis_galvo[-self.ramp_down_samples:] = np.linspace(slow_axis_galvo[-self.ramp_down_samples],
-                                                                    self.dot_starts[1], self.ramp_down_samples)
-            fill_samples = max(0, self.galvo_sw_settle_samples - (self.samples_offset + self.ramp_down_samples))
-            fast_axis_galvo = np.pad(fast_axis_galvo, (self.galvo_return, fill_samples), 'constant',
-                                     constant_values=(self.galvo_starts[0], self.galvo_starts[0]))
-            slow_axis_galvo = np.pad(slow_axis_galvo, (self.galvo_return, fill_samples), 'constant',
-                                     constant_values=(self.dot_starts[1], self.dot_starts[1]))
-            _sqr = np.pad(np.ones(self.samples_high), (0, self.samples_low), 'constant', constant_values=(0, 0))
-            square_wave = np.pad(np.tile(_sqr, self.dot_pos.size),
-                                 (self.samples_delay, self.samples_offset + self.ramp_down_samples), 'constant',
-                                 constant_values=(0, 0))
-            laser_trigger = np.tile(square_wave, self.dot_pos.size)
-            return fast_axis_galvo, slow_axis_galvo, laser_trigger
-        else:
-            return
 
     def generate_digital_scanning_triggers(self, lasers, camera):
         cam_sw = self.galvo_sw_states[camera]
