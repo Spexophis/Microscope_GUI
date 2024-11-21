@@ -174,7 +174,7 @@ class AOWidget(QtWidgets.QWidget):
         layout_deformablemirror = QtWidgets.QGridLayout()
 
         self.QComboBox_dms = cw.ComboBoxWidget(list_items=[])
-        self.QComboBox_wfsmd = cw.ComboBoxWidget(list_items=['phase', 'zonal', 'modal'])
+        self.QComboBox_wfsmd = cw.ComboBoxWidget(list_items=['modal', 'phase', 'zonal'])
         self.QSpinBox_actuator = cw.SpinBoxWidget(0, 96, 1, 0)
         self.QDoubleSpinBox_actuator_push = cw.DoubleSpinBoxWidget(-1, 1, 0.005, 3, 0)
         self.QPushButton_push_actuator = cw.PushButtonWidget('Push')

@@ -669,6 +669,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_dot_range_x_act.setValue(values.get("QDoubleSpinBox_dot_range_x_act", 0))
         self.QDoubleSpinBox_dot_range_y_act.setValue(values.get("QDoubleSpinBox_dot_range_y_act", 0))
         self.QDoubleSpinBox_dot_step_x_act.setValue(values.get("QDoubleSpinBox_dot_step_x_act", 0))
+        self.QDoubleSpinBox_dot_step_y_act.setValue(values.get("QDoubleSpinBox_dot_step_y_act", 0))
         self.QSpinBox_dot_step_x_act.setValue(values.get("QSpinBox_dot_step_x_act", 0))
         self.QDoubleSpinBox_galvo_offset_x_act.setValue(values.get("QDoubleSpinBox_galvo_offset_x_act", 0))
         self.QDoubleSpinBox_galvo_offset_y_act.setValue(values.get("QDoubleSpinBox_galvo_offset_y_act", 0))
