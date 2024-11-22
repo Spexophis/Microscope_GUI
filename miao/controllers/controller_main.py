@@ -1,7 +1,7 @@
 import os
 import time
 import traceback
-
+import uuid
 import numpy as np
 import pandas as pd
 import tifffile as tf
@@ -133,7 +133,8 @@ class MainController(QtCore.QObject):
         self.v.ao_view.Signal_img_shwfs_correct_wf.connect(self.run_close_loop_correction)
         self.v.ao_view.Signal_sensorlessAO_run.connect(self.run_sensorless_iteration)
         self.v.ao_view.Signal_sensorlessAO_auto.connect(self.run_auto_sensorless)
-        self.v.ao_view.Signal_sensorlessAO_acquisition.connect(self.run_sensorless_acquisitions)
+        self.v.ao_view.Signal_sensorlessAO_metric_acquisition.connect(self.run_sensorless_metric_acquisition)
+        self.v.ao_view.Signal_sensorlessAO_ml_acquisition.connect(self.run_sensorless_ml_acquisition)
 
     def _initial_setup(self):
         try:
@@ -1653,17 +1654,14 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.sensorless_iterations)
 
-    def sensorless_acquisitions(self):
+    def sensorless_metric_acquisition(self):
         try:
             self.prepare_sensorless_iteration()
         except Exception as e:
             self.logg.error(f"Prepare sensorless iteration Error: {e}")
             return
         try:
-            lpr, hpr, slf, mf, err = self.ao_controller.get_ao_parameters()
-            if mf == 'Mask(Intensity)':
-                msk = self.view_controller.get_image_data(7)
-            name = time.strftime("%Y%m%d_%H%M%S_") + 'sensorless_acquisitions'
+            name = time.strftime("%Y%m%d_%H%M%S_") + 'sensorless_metric_acquisition'
             new_folder = os.path.join(self.data_folder, name)
             os.makedirs(new_folder, exist_ok=True)
             self.logg.info(f'Directory {new_folder} has been created successfully.')
@@ -1712,9 +1710,54 @@ class MainController(QtCore.QObject):
         self.finish_sensorless_iteration()
 
     @QtCore.pyqtSlot()
-    def run_sensorless_acquisitions(self):
+    def run_sensorless_metric_acquisition(self):
         self.v.get_dialog()
-        self.run_task(task=self.sensorless_acquisitions)
+        self.run_task(task=self.sensorless_metric_acquisition)
+
+    def sensorless_ml_acquisition(self):
+        try:
+            self.prepare_sensorless_iteration()
+        except Exception as e:
+            self.logg.error(f"Prepare sensorless iteration Error: {e}")
+            return
+        try:
+            name = time.strftime("%Y%m%d_%H%M%S_") + 'sensorless_ml_acquisition'
+            new_folder = os.path.join(self.data_folder, name)
+            os.makedirs(new_folder, exist_ok=True)
+            self.logg.info(f'Directory {new_folder} has been created successfully.')
+        except Exception as e:
+            self.logg.error(f'Error creating directory for sensorless iteration: {e}')
+            return
+        try:
+            mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
+            md = self.ao_controller.get_img_wfs_method()
+            self.m.cam_set[self.cameras["imaging"]].start_live()
+            self.dfm.set_dm(self.dfm.dm_cmd[self.dfm.current_cmd])
+            self.logg.info("Automated sensorless AO iterations start")
+            mds = np.arange(mode_start, mode_stop + 1)
+            for _ in range(30):
+                amps = np.random.uniform(amp_start, -amp_start, size=mds.shape)
+                cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
+                for m, a in zip(mds, amps):
+                    cmd = self.dfm.cmd_add(self.dfm.get_zernike_cmd(m, a, method=md), cmd)
+                self.dfm.set_dm(cmd)
+                time.sleep(0.08)
+                self.m.daq.run_triggers()
+                time.sleep(0.032)
+                self.m.daq.stop_triggers(_close=False)
+                img = self.m.cam_set[self.cameras["imaging"]].get_last_image()
+                fn = os.path.join(new_folder, f"{str(uuid.uuid4())}.tiff")
+                tf.imwrite(str(fn), img, metadata={"modes": mds.tolist(), "amplitudes": amps.tolist()})
+        except Exception as e:
+            self.finish_sensorless_iteration()
+            self.logg.error(f"Sensorless AO Error: {e}")
+            return
+        self.finish_sensorless_iteration()
+
+    @QtCore.pyqtSlot()
+    def run_sensorless_ml_acquisition(self):
+        self.v.get_dialog()
+        self.run_task(task=self.sensorless_ml_acquisition)
 
     def auto_sensorless(self):
         self.loop_flag = True

@@ -22,7 +22,8 @@ class AOWidget(QtWidgets.QWidget):
     Signal_save_dm = QtCore.pyqtSignal()
     Signal_sensorlessAO_run = QtCore.pyqtSignal()
     Signal_sensorlessAO_auto = QtCore.pyqtSignal()
-    Signal_sensorlessAO_acquisition = QtCore.pyqtSignal()
+    Signal_sensorlessAO_metric_acquisition = QtCore.pyqtSignal()
+    Signal_sensorlessAO_ml_acquisition = QtCore.pyqtSignal()
 
     def __init__(self, config, logg, path, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -238,7 +239,8 @@ class AOWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_select_frequency = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 1.410)
         self.QPushButton_sensorless_run = cw.PushButtonWidget('Run AO')
         self.QPushButton_sensorless_auto = cw.PushButtonWidget('Auto AO')
-        self.QPushButton_sensorless_acqs = cw.PushButtonWidget('Run ACQs')
+        self.QPushButton_sensorless_metric_acqs = cw.PushButtonWidget('Run MFACQs')
+        self.QPushButton_sensorless_ml_acqs = cw.PushButtonWidget('Run MLACQs')
         self.QRadioButton_sensorless_error = cw.RadioButtonWidget('ErrorIn')
 
         layout_sensorless.addWidget(cw.LabelWidget(str('Zernike Modes')), 0, 0, 1, 2)
@@ -264,7 +266,8 @@ class AOWidget(QtWidgets.QWidget):
         layout_sensorless.addWidget(self.QRadioButton_sensorless_error, 2, 5, 1, 1)
         layout_sensorless.addWidget(self.QPushButton_sensorless_run, 3, 5, 1, 1)
         layout_sensorless.addWidget(self.QPushButton_sensorless_auto, 4, 5, 1, 1)
-        layout_sensorless.addWidget(self.QPushButton_sensorless_acqs, 3, 0, 1, 2)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_metric_acqs, 3, 0, 1, 2)
+        layout_sensorless.addWidget(self.QPushButton_sensorless_ml_acqs, 4, 0, 1, 2)
         return layout_sensorless
 
     def _set_signal_connections(self):
@@ -286,7 +289,8 @@ class AOWidget(QtWidgets.QWidget):
         self.QPushButton_dwfs_cl_correction.clicked.connect(self.run_close_loop_correction)
         self.QPushButton_sensorless_run.clicked.connect(self.run_sensorless_correction)
         self.QPushButton_sensorless_auto.clicked.connect(self.run_sensorless_auto)
-        self.QPushButton_sensorless_acqs.clicked.connect(self.run_sensorless_acquisition)
+        self.QPushButton_sensorless_metric_acqs.clicked.connect(self.run_sensorless_metric_acquisition)
+        self.QPushButton_sensorless_ml_acqs.clicked.connect(self.run_sensorless_ml_acquisition)
 
     def _set_initial_values(self):
         self.QComboBox_wfs_camera_selection.setCurrentIndex(1)
@@ -380,8 +384,12 @@ class AOWidget(QtWidgets.QWidget):
         self.Signal_sensorlessAO_auto.emit()
 
     @QtCore.pyqtSlot()
-    def run_sensorless_acquisition(self):
-        self.Signal_sensorlessAO_acquisition.emit()
+    def run_sensorless_metric_acquisition(self):
+        self.Signal_sensorlessAO_metric_acquisition.emit()
+
+    @QtCore.pyqtSlot()
+    def run_sensorless_ml_acquisition(self):
+        self.Signal_sensorlessAO_ml_acquisition.emit()
 
     def save_spinbox_values(self):
         values = {}
