@@ -35,15 +35,18 @@ class ImageReconstruction:
         self.xv = self.pixel_size_x * self.xv
         self.yv = self.pixel_size_y * self.yv
 
-    def set_scanning_parameters(self, step_nums=(32, 32)):
+    def set_scanning_parameters(self, step_nums=(32, 32), step_sizes=(0.028, 0.028)):
         assert step_nums[0] * step_nums[1] == self.n, f"Scanning step numbers does not match the data size"
         self.step_y, self.step_x = step_nums
+        self.step_size_y, self.step_size_x = step_sizes
 
     def set_focal_parameters(self, periods=(0.83, 0.83), ranges=((20., 40.), (20., 40.))):
         self.period_x_um, self.period_y_um = periods  # micrometer
         self.range_x_um, self.range_y_um = ranges  # micrometers
-        x_centers = np.arange(self.range_x_um[0], self.range_x_um[1], self.period_x_um)
-        y_centers = np.arange(self.range_y_um[0], self.range_y_um[1], self.period_y_um)
+        x_centers = np.arange(self.range_x_um[0] + self.period_x_um, self.range_x_um[1] - self.period_x_um,
+                              self.period_x_um)
+        y_centers = np.arange(self.range_y_um[0] + self.period_y_um, self.range_y_um[1] - self.period_y_um,
+                              self.period_y_um)
         self.nxc = x_centers.shape[0]
         self.nyc = y_centers.shape[0]
         x_grid, y_grid = np.meshgrid(x_centers, y_centers)
@@ -117,6 +120,35 @@ class ImageReconstruction:
                 subarray_stack.append(subarray[::-1, ::-1])
         return np.asarray(subarray_stack)
 
+    def process_sub_stacks(self, data_stack, swp=False):
+        img_stack = []
+        for i, (y_center, x_center) in enumerate(self.center_list):
+            x_start = max(0, x_center - self.period_x_um / 2)
+            y_start = max(0, y_center - self.period_y_um / 2)
+            x_end = min(self.nx * self.pixel_size_x, x_start + self.period_x_um)
+            y_end = min(self.ny * self.pixel_size_y, y_start + self.period_y_um)
+            x_start_px = int(x_start / self.pixel_size_x)
+            y_start_px = int(y_start / self.pixel_size_y)
+            x_end_px = int(x_end / self.pixel_size_x)
+            y_end_px = int(y_end / self.pixel_size_y)
+            sub_stack = data_stack[:, y_start_px:y_end_px, x_start_px:x_end_px]
+            gm = self.gaussian_mask(size=sub_stack[0].shape)
+            sub_img = []
+            for slic in sub_stack:
+                sub_img.append(np.sum(slic * gm))
+            sub_img = np.asarray(sub_img).reshape(self.step_y, self.step_x)
+            if swp:
+                sub_img = sub_img.swapaxes(0, 1)
+            img_stack.append(sub_img)
+        return img_stack
+
+    def tile_sub_stacks(self, sub_stack):
+        hst = []
+        for i in range(self.nyc):
+            hst.append(np.hstack(sub_stack[self.nxc * i:self.nxc * (i + 1)]))
+        final_image = np.vstack(np.asarray(hst)[::-1, :, :], )
+        return final_image
+
     def tile_sub_images(self, substack, axis='x'):
         x_tiles = self.nxc
         y_tiles = self.nyc
@@ -149,6 +181,14 @@ class ImageReconstruction:
             return g * msk
         else:
             return g
+
+    def gaussian_mask(self, size):
+        sy, sx = size
+        xx, yy = np.meshgrid(np.linspace(-sx / 2, sx / 2, sx), np.linspace(-sy / 2, sy / 2, sy))
+        x_ = self.pixel_size_x * xx
+        y_ = self.pixel_size_y * yy
+        g = np.exp(-(x_ ** 2 + y_ ** 2) / (2 * self.sigma ** 2))
+        return g
 
     def extract_periods(self):
         self.image_avg = np.average(self.data_stack, axis=0)
@@ -204,19 +244,18 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     r = ImageReconstruction()
-    r.load_data(r"C:\Users\ruizhe.lin\Documents\data\20241001\20241001124830_dot_scanning_crop.tif")
+    r.load_data(r"C:\Users\ruizhe.lin\Desktop\20241128151717_dot_scanning-1.tif")
     r.pixel_size_x = 0.081
     r.pixel_size_y = 0.081
     r.generate_coordinates()
-    r.set_scanning_parameters(step_nums=(27, 27))
+    r.set_scanning_parameters(step_nums=(30, 30), step_sizes=(0.028, 0.028))
     data_avg = np.average(r.data_stack, axis=0)
-    r.set_focal_parameters(periods=(0.846, 0.846), ranges=((0.4, r.nx * r.pixel_size_x), (0.36, r.ny * r.pixel_size_y)))
+    r.set_focal_parameters(periods=(0.85, 0.85), ranges=((0.4, r.nx * r.pixel_size_x), (-0.2, r.ny * r.pixel_size_y)))
     arr = r.generate_center_array()
     plt.figure()
     plt.imshow(arr, cmap='viridis', interpolation='none')
-    plt.imshow(data_avg, cmap='plasma', interpolation='none', alpha=0.2)
+    plt.imshow(data_avg, cmap='plasma', interpolation='none', alpha=0.7)
     plt.savefig(r'C:\Users\ruizhe.lin\Desktop\alignment.png', dpi=600)
-    gd = r.apply_gaussian(r.data_stack)
-    sub = r.stack_subarray(gd, direction=2)
-    result = r.tile_sub_images(sub, 'y')
+    sub = r.process_sub_stacks(r.data_stack)
+    result = r.tile_sub_stacks(sub)
     tf.imwrite(r'C:\Users\ruizhe.lin\Desktop\result_image.tif', result)
