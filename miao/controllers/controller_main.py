@@ -1530,20 +1530,20 @@ class MainController(QtCore.QObject):
 
     def sensorless_iterations(self):
         try:
-            self.prepare_sensorless_iteration()
-        except Exception as e:
-            self.logg.error(f"Prepare sensorless iteration Error: {e}")
-            return
-        try:
             lpr, hpr, slf, mf, err = self.ao_controller.get_ao_parameters()
             if mf == 'Mask(Intensity)':
                 msk = self.view_controller.get_image_data(7)
-            name = time.strftime("%Y%m%d_%H%M%S_") + '_auto_ao_iterations_' + mf
+            name = time.strftime("%Y%m%d_%H%M%S_") + self.dfm.dm_serial + '_ao_iterations_' + mf
             new_folder = os.path.join(self.data_folder, name)
             os.makedirs(new_folder, exist_ok=True)
             self.logg.info(f'Directory {new_folder} has been created successfully.')
         except Exception as e:
             self.logg.error(f'Error creating directory for sensorless iteration: {e}')
+            return
+        try:
+            self.prepare_sensorless_iteration()
+        except Exception as e:
+            self.logg.error(f"Prepare sensorless iteration Error: {e}")
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
