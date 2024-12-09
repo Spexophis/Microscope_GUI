@@ -1,5 +1,6 @@
 import pandas as pd
 import math
+import tifffile as tf
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib
@@ -127,3 +128,24 @@ plt.legend(fontsize=12, loc='best')
 plt.tight_layout()
 plt.savefig(r'C:\Users\Ruiz\Desktop\New folder\fwhm.png', dpi=600)
 plt.show()
+
+
+# Reconstruct wavefront
+zernike = tool_zernike.zernike_polynomials(size=[128, 128])
+zslopes = tool_zernike.zernike_derivatives(size=[128, 128])
+fn = r"C:\Users\ruizhe.lin\Documents\data\dm_files\bax513\influence_function_modal_2024_11_25_16_54.tif"
+inf_model = tf.imread(fn)
+fnd = r"D:\data\20241128\20241128183628_BAX513_cmd_file.xlsx"
+df = pd.read_excel(fnd, sheet_name=None)
+cmds = []
+for key, cmd in df.items():
+    cmds.append(df[key]['Push'].tolist())
+r = []
+wf = []
+for cmd in cmds:
+    r_temp = np.dot(inf_model, np.asarray(cmd)) - np.dot(inf_model, np.asarray(cmds[1]))
+    r.append(r_temp)
+    wf_temp = np.zeros((128, 128))
+    for i in range(16):
+        wf_temp += zernike[i] * r_temp[i]
+    wf.append(wf_temp)

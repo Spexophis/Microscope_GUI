@@ -156,8 +156,10 @@ class MainController(QtCore.QObject):
             self.pixel_sizes[0] = 0.081
             self.magnifications[0] = self.m.cam_set[0].ps / self.pixel_sizes[0]
 
+            self.dm_cmd_ind = {}
             for key in self.m.dm.keys():
                 self.v.ao_view.QComboBox_dms.addItem(key)
+                self.dm_cmd_ind[key] = self.m.dm[key].current_cmd
             self.dfm = self.m.dm[self.v.ao_view.QComboBox_dms.currentText()]
             self.logg.info("Finish setting up controllers")
         except Exception as e:
@@ -850,9 +852,12 @@ class MainController(QtCore.QObject):
             self.m.daq.run_triggers()
             time.sleep(1.)
             fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_dot_scanning.tif')
+            for key in self.dm_cmd_ind.keys():
+                self.dm_cmd_ind[key] = self.m.dm[key].current_cmd
             tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
                 1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
+                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
+                                 'DM cmd': self.dm_cmd_ind})
         except Exception as e:
             self.finish_dot_scanning()
             self.logg.error(f"Error running dot scanning: {e}")
