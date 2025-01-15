@@ -62,7 +62,7 @@ class MCLNanoDrive:
         return logging
 
     def set_clock_frequency(self):
-        self.mcl_piezo.change_clock(4, 0, self.handle)
+        self.mcl_piezo.change_clock(3, 0, self.handle)
         self.mcl_piezo.change_clock(0.1, 1, self.handle)
         freq_adc, freq_dac = self.mcl_piezo.get_clock_frequency(self.handle)
         return freq_adc, freq_dac

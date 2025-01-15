@@ -1,5 +1,6 @@
 import sys
 import threading
+import time
 from collections import deque
 
 import numpy as np
@@ -24,6 +25,8 @@ class EMCCDCamera:
             self.t_kinetic = None
             self.bin_h = 1
             self.bin_v = 1
+            self.cp_h = 1024
+            self.cp_w = 1024
             self.start_h = 1
             self.end_h = 1024
             self.start_v = 1
@@ -79,12 +82,16 @@ class EMCCDCamera:
             self.get_sn()
             self.cooler_on()
             # self.set_frame_transfer(0)
-            # self.set_readout_rate(0, 3)
+            self.set_readout_rate(2, 0, 0)
         except Exception as e:
             self.logg.error(f"Error configuring camera: {e}")
 
     def close(self):
         self.cooler_off()
+        temp = self.get_ccd_temperature()
+        while temp <= 0:
+            time.sleep(0.1)
+            temp = self.get_ccd_temperature()
         ret = self.sdk.ShutDown()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("Andor EMCCD Shut Down")
@@ -151,15 +158,28 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    def set_readout_rate(self, hs=0, vs=3):
+    def set_readout_rate(self, va=2, hs=0, vs=0):
+        ret = self.sdk.SetVSAmplitude(va)
+        if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+            self.logg.info("Vertical Clock Voltage {}  ".format(va))
+        else:
+            self.logg.error(atmcd_errors.Error_Codes(ret))
         ret = self.sdk.SetHSSpeed(0, hs)
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
-            self.logg.info("Set Horizontal Speed")
+            (ret, speed) = self.sdk.GetHSSpeed(0, 0, hs)
+            if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+                self.logg.info("HSSpeeds {} MHz  ".format(speed))
+            else:
+                self.logg.error(atmcd_errors.Error_Codes(ret))
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
         ret = self.sdk.SetVSSpeed(vs)
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
-            self.logg.info("Set Vertical Speed")
+            (ret, speed) = self.sdk.GetVSSpeed(vs)
+            if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+                self.logg.info("VSSpeeds {} us/pixel  ".format(speed))
+            else:
+                self.logg.error(atmcd_errors.Error_Codes(ret))
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
@@ -186,6 +206,18 @@ class EMCCDCamera:
 
     def set_roi(self):
         ret = self.sdk.SetImage(self.bin_h, self.bin_v, self.start_h, self.end_h, self.start_v, self.end_v)
+        if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+            self.logg.info("bin_h = {} \nbin_v = {} \nstart_h = {} \nend_h = {} \nstart_v = {} \nend_v = {}".format(
+                self.bin_h, self.bin_v, self.start_h, self.end_h, self.start_v, self.end_v))
+            self.pixels_x = self.end_h - self.start_h + 1
+            self.pixels_y = self.end_v - self.start_v + 1
+            self.img_size = self.pixels_x * self.pixels_y
+            self.ps = 13 / self.bin_h
+        else:
+            self.logg.error(atmcd_errors.Error_Codes(ret))
+
+    def set_crop(self):
+        ret = self.sdk.SetIsolatedCropMode(1, self.cp_h, self.cp_w, self.bin_h, self.bin_v)
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("bin_h = {} \nbin_v = {} \nstart_h = {} \nend_h = {} \nstart_v = {} \nend_v = {}".format(
                 self.bin_h, self.bin_v, self.start_h, self.end_h, self.start_v, self.end_v))
