@@ -88,10 +88,10 @@ class EMCCDCamera:
 
     def close(self):
         self.cooler_off()
-        temp = self.get_ccd_temperature()
-        while temp <= 0:
-            time.sleep(0.1)
-            temp = self.get_ccd_temperature()
+        self.get_ccd_temperature()
+        while self.temperature <= 0:
+            time.sleep(1)
+            self.get_ccd_temperature()
         ret = self.sdk.ShutDown()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("Andor EMCCD Shut Down")
@@ -124,10 +124,8 @@ class EMCCDCamera:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
     def get_ccd_temperature(self):
-        ret, temperature = self.sdk.GetTemperature()
-        self.logg.info("{}".format(ret))
-        self.logg.info("EMCCD Temperature is {}".format(self.temperature))
-        return temperature
+        ret, self.temperature = self.sdk.GetTemperature()
+        self.logg.info("EMCCD Temperature {} C".format(self.temperature))
 
     def check_camera_status(self):
         ret, status = self.sdk.GetStatus()
