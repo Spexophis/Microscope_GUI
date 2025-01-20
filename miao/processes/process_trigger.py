@@ -666,7 +666,8 @@ class TriggerSequence:
         slow_axis_galvo_act = np.zeros_like(fast_axis_galvo_act)
         indices_act = np.arange(self.ramp_up_samples_act + 1, len(fast_axis_galvo_act), extended_cycle_act.size)
         slow_axis_galvo_act[indices_act] = 1
-        slow_axis_galvo_act = np.cumsum(slow_axis_galvo_act) * self.dot_step_y_act + self.dot_starts_act[1] + slow_axis_offset_act
+        slow_axis_galvo_act = np.cumsum(slow_axis_galvo_act) * self.dot_step_y_act + self.dot_starts_act[
+            1] + slow_axis_offset_act
         slow_axis_galvo_act[-self.ramp_down_samples_act:] = np.linspace(
             slow_axis_galvo_act[-self.ramp_down_samples_act], self.dot_starts_act[1], self.ramp_down_samples_act)
         fill_samples_act = max(0, self.galvo_sw_settle_samples - (self.samples_offset_act + self.ramp_down_samples_act))
@@ -767,7 +768,8 @@ class TriggerSequence:
                                                     [self.dot_starts, [self.dot_step_v, self.dot_step_y],
                                                      self.dot_ranges, self.dot_pos.size], self.piezo_starts,
                                                     self.piezo_steps, self.piezo_ranges, scan_pos))
-        return np.asarray(galvo_sequences), np.asarray(piezo_sequences), np.asarray(digital_sequences), lasers, scan_pos
+        return (np.asarray(galvo_sequences), np.asarray(piezo_sequences), np.asarray(digital_sequences),
+                lasers, scan_pos)
 
     def generate_monalisa_scan_2d(self, lasers, camera):
         cam_sw = self.galvo_sw_states[camera]
@@ -811,7 +813,8 @@ class TriggerSequence:
         switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[1])
         for i, dtr in enumerate(digital_sequences):
             digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[1])
-        return np.asarray(digital_sequences), switch_trigger, piezo_sequences, lasers, self.piezo_scan_pos[2]
+        return (np.asarray(digital_sequences), np.asarray(piezo_sequences), switch_trigger,
+                lasers, self.piezo_scan_pos[2])
 
     def generate_piezo_line_scan(self, lasers, camera):
         cam_sw = self.galvo_sw_states[camera]

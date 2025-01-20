@@ -17,6 +17,7 @@ class ConWidget(QtWidgets.QWidget):
     Signal_galvo_path_switch = QtCore.pyqtSignal(float)
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
     Signal_daq_update = QtCore.pyqtSignal(int)
+    Signal_daq_reset = QtCore.pyqtSignal()
     Signal_plot_trigger = QtCore.pyqtSignal()
     Signal_focus_finding = QtCore.pyqtSignal()
     Signal_focus_locking = QtCore.pyqtSignal(bool)
@@ -391,6 +392,7 @@ class ConWidget(QtWidgets.QWidget):
 
         self.QSpinBox_daq_sample_rate = cw.SpinBoxWidget(100, 1250, 1, 250)
         self.QPushButton_plot_trigger = cw.PushButtonWidget("Plot Triggers")
+        self.QPushButton_reset_daq = cw.PushButtonWidget("Reset")
         self.QDoubleSpinBox_ttl_start_on_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.008)
         self.QDoubleSpinBox_ttl_stop_on_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.032)
         self.QDoubleSpinBox_ttl_start_off_488_0 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.008)
@@ -408,6 +410,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_ttl_start_tis = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.008)
         self.QDoubleSpinBox_ttl_stop_tis = cw.DoubleSpinBoxWidget(0, 50, 0.001, 3, 0.032)
         layout_daq.addWidget(cw.LabelWidget(str('Sample Rate / KS/s')), 0, 0, 1, 1)
+        layout_daq.addWidget(self.QPushButton_reset_daq, 0, 1, 1, 1)
         layout_daq.addWidget(self.QSpinBox_daq_sample_rate, 1, 0, 1, 1)
         layout_daq.addWidget(self.QPushButton_plot_trigger, 2, 0, 1, 1)
         layout_daq.addWidget(cw.LabelWidget(str('From / s')), 1, 1, 1, 1)
@@ -512,6 +515,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_laser_488_2.clicked.connect(self.set_laser_488_2)
         self.QPushButton_laser_405.clicked.connect(self.set_laser_405)
         self.QSpinBox_daq_sample_rate.valueChanged.connect(self.update_daq)
+        self.QPushButton_reset_daq.clicked.connect(self.reset_daq)
         self.QPushButton_plot_trigger.clicked.connect(self.plot_trigger_sequence)
         self.QPushButton_focus_finding.clicked.connect(self.run_focus_finding)
         self.QPushButton_focus_locking.clicked.connect(self.run_focus_locking)
@@ -730,6 +734,10 @@ class ConWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(int)
     def update_daq(self, sample_rate: int):
         self.Signal_daq_update.emit(sample_rate)
+
+    @QtCore.pyqtSlot()
+    def reset_daq(self):
+        self.Signal_daq_reset.emit()
 
     @QtCore.pyqtSlot()
     def plot_trigger_sequence(self):

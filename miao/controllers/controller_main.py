@@ -107,6 +107,7 @@ class MainController(QtCore.QObject):
         self.v.con_view.Signal_set_mask.connect(self.set_array_mask)
         # NIDAQ
         self.v.con_view.Signal_daq_update.connect(self.update_daq_sample_rate)
+        self.v.con_view.Signal_daq_reset.connect(self.reset_daq_channels)
         # Main Data Recording
         self.v.con_view.Signal_focal_array_scan.connect(self.run_focal_array_scan)
         self.v.con_view.Signal_grid_pattern_scan.connect(self.run_grid_pattern_scan)
@@ -358,7 +359,8 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def check_emdccd_temperature(self):
         try:
-            self.con_controller.display_camera_temperature(self.m.ccdcam.get_ccd_temperature())
+            self.m.ccdcam.get_ccd_temperature()
+            self.con_controller.display_camera_temperature(self.m.ccdcam.temperature)
         except Exception as e:
             self.logg.error(f"CCD Camera Error: {e}")
 
@@ -410,6 +412,10 @@ class MainController(QtCore.QObject):
         self.p.trigger.update_nidaq_parameters(sr * 1000)
         self.update_galvo_scanner()
         self.m.daq.sample_rate = sr * 1000
+
+    @QtCore.pyqtSlot()
+    def reset_daq_channels(self):
+        self.m.daq.stop_triggers()
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
@@ -883,7 +889,7 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, chs, pos = self.p.trigger.generate_monalisa_scan_2d(self.lasers, self.cameras["imaging"])
+        dtr, ptr, sw, chs, pos = self.p.trigger.generate_monalisa_scan_2d(self.lasers, self.cameras["imaging"])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
