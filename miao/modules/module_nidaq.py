@@ -370,7 +370,7 @@ class NIDAQ:
                 _task = None
         self._active = {key: False for key in self._active}
 
-    def measure_ao(self, output_channel, input_channel, data):
+    def measure_ao(self, output_channel, input_channel, data, clk="/Dev1/ao/SampleClock"):
         num_samples = data.shape[0]
         acquired_data = np.zeros(num_samples)
         with nidaqmx.Task() as output_task:
@@ -383,7 +383,7 @@ class NIDAQ:
                 input_task.timing.cfg_samp_clk_timing(rate=self.sample_rate,
                                                       sample_mode=AcquisitionType.FINITE,
                                                       samps_per_chan=num_samples,
-                                                      source="/Dev1/ao/SampleClock")
+                                                      source=clk)
                 writer = AnalogSingleChannelWriter(output_task.out_stream)
                 reader = AnalogSingleChannelReader(input_task.in_stream)
                 writer.write_many_sample(data)

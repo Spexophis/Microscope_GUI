@@ -2,7 +2,9 @@ from miao.modules import module_andorixon
 from miao.modules import module_deformablemirror
 from miao.modules import module_hamamatsu
 from miao.modules import module_thorlabcam
-from miao.modules import module_laser
+from miao.modules import module_slm_qxga
+from miao.modules import module_slm_lcos
+from miao.modules import module_coboltlaser
 from miao.modules import module_mcldeck
 from miao.modules import module_mclpiezo
 from miao.modules import module_nidaq
@@ -43,8 +45,17 @@ class MainModule:
                                                                         config=self.config, path=self.data_folder)
             except Exception as e:
                 self.logg.error_log.error(f"{e}")
+        self.slm = {}
         try:
-            self.laser = module_laser.CoboltLaser(logg=self.logg.error_log)
+            self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
+        try:
+            self.slm["Phase"] = module_slm_lcos.LCOS(logg=self.logg.error_log, config=self.config)
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
+        try:
+            self.laser = module_coboltlaser.CoboltLaser(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:

@@ -1086,6 +1086,51 @@ class TriggerSequence:
                                                     self.piezo_steps, self.piezo_ranges, scan_pos))
         return np.asarray(galvo_sequences), np.asarray(piezo_sequences), np.asarray(digital_sequences), lasers, scan_pos
 
+    def generate_point_scan_resolft_2d(self, lasers, camera):
+        cam_sw = self.galvo_sw_states[camera]
+        cam_ind = camera + 4
+        lasers = lasers.copy()
+        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
+        if interval_samples > self.digital_starts[cam_ind]:
+            offset_samples = interval_samples - self.digital_starts[cam_ind]
+            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
+            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
+        cycle_samples = self.digital_ends[cam_ind] + max(self.standby_samples, self.return_samples)
+        digital_trigger = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
+        switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
+        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
+        self.exposure_time = self.exposure_samples / self.sample_rate
+        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_ends[cam_ind]] = 1
+        for ln, laser in enumerate(lasers):
+            digital_trigger[ln, self.digital_starts[laser]:self.digital_ends[laser]] = 1
+        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = 0.
+        switch_trigger[
+        self.digital_starts[cam_ind] - self.galvo_sw_settle_samples:self.digital_starts[cam_ind]] = smooth_ramp(0.,
+                                                                                                                cam_sw,
+                                                                                                                self.galvo_sw_settle_samples)
+        switch_trigger[
+        self.digital_ends[cam_ind]:self.digital_ends[cam_ind] + self.galvo_sw_settle_samples] = smooth_ramp(cam_sw, 0.,
+                                                                                                            self.galvo_sw_settle_samples)
+        switch_trigger[self.digital_ends[cam_ind] + self.galvo_sw_settle_samples:] = 0.
+        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[0])
+        digital_sequences = [np.empty((0,)) for _ in range(len(lasers) + 1)]
+        for i, dtr in enumerate(digital_trigger):
+            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[0])
+        lasers.append(cam_ind)
+        piezo_sequences = [np.empty((0,)) for _ in range(2)]
+        piezo_sequences[0] = np.repeat(self.piezo_scan_positions[0], cycle_samples)
+        piezo_sequences[0] = shift_array(piezo_sequences[0], max(self.standby_samples, self.return_samples),
+                                         fill=piezo_sequences[0][0], direction="backward")
+        piezo_sequences[0] = np.tile(piezo_sequences[0], self.piezo_scan_pos[1])
+        piezo_sequences[1] = np.repeat(self.piezo_scan_positions[1], cycle_samples * self.piezo_scan_pos[0])
+        piezo_sequences[1] = shift_array(piezo_sequences[1], max(self.standby_samples, self.return_samples),
+                                         fill=piezo_sequences[1][0], direction="backward")
+        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[1])
+        for i, dtr in enumerate(digital_sequences):
+            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[1])
+        return (np.asarray(digital_sequences), np.asarray(piezo_sequences), switch_trigger,
+                lasers, self.piezo_scan_pos[2])
+
 
 def smooth_ramp(start, end, samples, curve_half=0.02):
     n = int(curve_half * samples)

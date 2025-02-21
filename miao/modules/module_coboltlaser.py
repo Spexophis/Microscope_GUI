@@ -3,22 +3,19 @@ import pycobolt
 
 class CoboltLaser:
 
-    def __init__(self, logg=None):
+    def __init__(self, logg=None, config=None):
         self.logg = logg or self.setup_logging()
-        laser_dict = {"405": 'COM4',
-                      "488_0": 'COM5',
-                      "488_1": 'COM6',
-                      "488_2": 'COM7'}
+        self.config = config or self.load_configs()
+        laser_dict = {}
+        for las, inf in self.config.configs["Light Sources"]["Lasers"]["Cobolt"].items():
+            laser_dict[las] = inf["Serial"]
         self.lasers, self._h = self._initiate_lasers(laser_dict)
-
-    def __del__(self):
-        pass
 
     def _initiate_lasers(self, laser_dict):
         lasers = {}
         for laser, com_port in laser_dict.items():
             try:
-                lasers[laser] = pycobolt.Cobolt06MLD(port=com_port)
+                lasers[laser] = pycobolt.Cobolt06MLD(serialnumber=com_port)
                 self.logg.info("{} Laser Connected".format(laser))
             except Exception as e:
                 self.logg.error(f"405 nm Laser Error: {e}")
@@ -36,6 +33,13 @@ class CoboltLaser:
         import logging
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
         return logging
+
+    @staticmethod
+    def load_configs():
+        config_file = input("Enter configuration file directory: ")
+        from miao.utilities import configurations
+        cfg = configurations.MicroscopeConfiguration(fd=config_file)
+        return cfg
 
     def laser_off(self, laser):
         if laser == "all":
