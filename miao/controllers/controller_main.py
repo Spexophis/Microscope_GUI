@@ -390,9 +390,8 @@ class MainController(QtCore.QObject):
                 self.m.cam_set[0].bin_h, self.m.cam_set[0].bin_v = bx, by
                 self.m.cam_set[0].start_h, self.m.cam_set[0].end_h = x, x + nx - 1
                 self.m.cam_set[0].start_v, self.m.cam_set[0].end_v = y, y + ny - 1
-                self.m.cam_set[0].set_roi()
                 self.m.cam_set[0].gain = self.con_controller.get_emccd_gain()
-                self.m.cam_set[0].set_gain()
+                self.m.cam_set[0].t_exposure = self.con_controller.get_emccd_expo()
             if self.cameras[key] == 1:
                 x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
                 self.m.cam_set[1].set_roi(bx, by, x, x + nx, y, y + ny)
@@ -437,6 +436,7 @@ class MainController(QtCore.QObject):
             return_time = self.con_controller.get_piezo_return_time()
             self.p.trigger.update_piezo_scan_parameters(axis_lengths, step_sizes, positions, return_time)
             self.p.trigger.update_camera_parameters(initial_time=self.m.cam_set[self.cameras[cam_key]].t_clean,
+                                                    exposure_time=self.m.cam_set[self.cameras[cam_key]].t_exposure,
                                                     standby_time=self.m.cam_set[self.cameras[cam_key]].t_readout,
                                                     cycle_time=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
             if self.cameras[cam_key] == 0:
@@ -495,9 +495,9 @@ class MainController(QtCore.QObject):
                 self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
         if vd_mod == "Scan Calib":
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-            dtr, sw, ptr, chs = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
-            self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
-                                      digital_sequences=dtr, digital_channels=chs, finite=False)
+            dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
+            self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+                                      digital_sequences=dtr, digital_channels=dch, finite=False)
         if vd_mod == "Focus Lock":
             self.logg.info(f"Focus Lock live")
 
@@ -791,11 +791,11 @@ class MainController(QtCore.QObject):
         self.set_camera_roi("imaging")
         self.update_trigger_parameters("imaging")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-        dtr, sw, pz, dch, pos = self.p.trigger.generate_widefield_zstack_triggers(self.lasers, self.cameras["imaging"])
-        self.set_piezo_position_z(pz[0] * 10)
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        self.set_piezo_position_z(self.p.trigger.piezo_scan_positions[2][0])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.m.daq.write_triggers(piezo_sequences=pz, piezo_channels=[2], digital_sequences=dtr, digital_channels=dch,
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
 
@@ -889,12 +889,12 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.update_trigger_parameters("imaging")
-        dtr, ptr, sw, chs, pos = self.p.trigger.generate_monalisa_scan_2d(self.lasers, self.cameras["imaging"])
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   galvo_sequences=sw, galvo_channels=[2],
-                                  digital_sequences=dtr, digital_channels=chs)
+                                  digital_sequences=dtr, digital_channels=dch)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
 
     def monalisa_scan_2d(self):

@@ -30,7 +30,7 @@ class TriggerSequence:
             self.piezo_scan_positions = [start + step * np.arange(ns) for start, step, ns in
                                          zip(self.piezo_starts, self.piezo_steps, self.piezo_scan_pos)]
             # galvo switcher
-            self.galvo_sw_settle = 0.0025  # s
+            self.galvo_sw_settle = 0.00064  # s
             self.galvo_sw_settle_samples = int(np.ceil(self.galvo_sw_settle * self.sample_rate))
             self.galvo_sw_states = [4., -2., 0.]
             # galvo scanner
@@ -91,8 +91,10 @@ class TriggerSequence:
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
             self.standby_time = 0.0467  # s
             self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-            self.exposure_samples = 0.  # s
-            self.exposure_time = self.exposure_samples / self.sample_rate
+            self.exposure_time = 0.001  # s
+            self.exposure_samples = int(np.ceil(self.exposure_time * self.sample_rate))
+            self.trigger_pulse_width = 100e-6  # s
+            self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
             # rolling shutter camera (light sheet mode of Hamamatsu sCMOS)
             self.line_interval = 1e-5  # s
             self.line_interval_samples = int(np.ceil(self.line_interval * self.sample_rate))
@@ -237,10 +239,13 @@ class TriggerSequence:
         self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
         self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
 
-    def update_camera_parameters(self, initial_time=None, standby_time=None, cycle_time=None):
+    def update_camera_parameters(self, initial_time=None, exposure_time=None, standby_time=None, cycle_time=None):
         if initial_time is not None:
             self.initial_time = initial_time
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
+        if exposure_time is not None:
+            self.exposure_time = exposure_time
+            self.exposure_samples = int(np.ceil(self.exposure_time * self.sample_rate))
         if standby_time is not None:
             self.standby_time = standby_time
             self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
@@ -250,67 +255,134 @@ class TriggerSequence:
     def generate_digital_triggers(self, lasers, camera):
         cam_sw = self.galvo_sw_states[camera]
         cam_ind = camera + 4
-        lasers = lasers.copy()
+        digital_channels = lasers.copy()
         interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
         if interval_samples > self.digital_starts[cam_ind]:
             offset_samples = interval_samples - self.digital_starts[cam_ind]
             self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
             self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        cycle_samples = self.digital_ends[cam_ind] + self.standby_samples
-        digital_trigger = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
+        cycle_samples = self.digital_starts[cam_ind] + self.exposure_samples + self.standby_samples
+        digital_trigger = np.zeros((len(digital_channels) + 1, cycle_samples), dtype=np.int8)
         switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_ends[cam_ind]] = 1
-        for ln, laser in enumerate(lasers):
+        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_starts[cam_ind] + self.trigger_pulse_samples] = 1
+        for ln, laser in enumerate(digital_channels):
             digital_trigger[ln, self.digital_starts[laser]:self.digital_ends[laser]] = 1
-        lasers.append(cam_ind)
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = 0.
-        switch_trigger[
-        self.digital_starts[cam_ind] - self.galvo_sw_settle_samples:self.digital_starts[cam_ind]] = smooth_ramp(0.,
-                                                                                                                cam_sw,
-                                                                                                                self.galvo_sw_settle_samples)
-        switch_trigger[
-        self.digital_ends[cam_ind]:self.digital_ends[cam_ind] + self.galvo_sw_settle_samples] = smooth_ramp(cam_sw, 0.,
-                                                                                                            self.galvo_sw_settle_samples)
-        switch_trigger[self.digital_ends[cam_ind] + self.galvo_sw_settle_samples:] = 0.
-        return digital_trigger, switch_trigger, lasers
+        digital_channels.append(cam_ind)
+        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] -= 0.32
+        switch_trigger[self.digital_starts[cam_ind] + self.exposure_samples + 1:] -= 0.32
+        return digital_trigger, switch_trigger, digital_channels
 
-    def generate_widefield_zstack_triggers(self, lasers, camera):
+    def generate_digital_triggers_for_scan(self, lasers, camera):
+        digital_triggers, switch_trigger, chs = self.generate_digital_triggers(lasers, camera)
+        if self.standby_samples > self.return_samples:
+            cycle_samples = digital_triggers.shape[1]
+        else:
+            compensate_samples = self.return_samples - self.standby_samples
+            cycle_samples = digital_triggers.shape[1] + compensate_samples
+            compensate_sequence = np.zeros((digital_triggers.shape[0], compensate_samples))
+            digital_triggers = np.concatenate((digital_triggers, compensate_sequence), axis=1)
+            compensate_sequence = switch_trigger[-1] * np.ones(compensate_samples)
+            switch_trigger = np.concatenate((switch_trigger, compensate_sequence))
+        return digital_triggers, switch_trigger, cycle_samples, chs
+
+    def generate_piezo_scan(self, lasers, camera):
+        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera)
+        pos = 1
+        pz_chs = []
+        for i in range(3):
+            if self.piezo_scan_pos[i] > 0:
+                pos *= self.piezo_scan_pos[i]
+                pz_chs.append(i)
+        if len(pz_chs) == 0:
+            raise Exception("Error: zero piezo scan step")
+        piezo_sequences = [np.empty((0,)) for _ in range(len(pz_chs))]
+        for n, pch in enumerate(pz_chs):
+            piezo_sequences[n] = np.repeat(self.piezo_scan_positions[pch], digital_triggers.shape[1])
+            piezo_sequences[n] = shift_array(piezo_sequences[n], max(self.standby_samples, self.return_samples),
+                                             fill=piezo_sequences[n][0], direction="backward")
+            for i in range(n):
+                piezo_sequences[i] = np.tile(piezo_sequences[i], self.piezo_scan_pos[pch])
+            digital_triggers = np.tile(digital_triggers, self.piezo_scan_pos[pch])
+            switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[pch])
+        return digital_triggers, switch_trigger, np.asarray(piezo_sequences), dig_chs, pz_chs, pos
+
+    def generate_piezo_line_scan(self, lasers, camera):
+        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera)
+        pz_chs = []
+        for i in range(3):
+            if self.piezo_scan_pos[i] > 0:
+                pz_chs.append(i)
+        piezo_sequences = np.ones((len(pz_chs), cycle_samples))
+        n = cycle_samples - self.return_samples
+        for i, pch in enumerate(pz_chs):
+            piezo_sequences[i] *= self.piezo_starts[pch]
+            piezo_sequences[i, :n] = np.linspace(start=self.piezo_starts[pch],
+                                                 stop=self.piezo_starts[pch] + self.piezo_ranges[pch],
+                                                 num=n, endpoint=True)
+        return digital_triggers, switch_trigger, piezo_sequences, dig_chs, pz_chs
+
+    def generate_piezo_point_scan_2d(self, lasers, camera, lt=0.25, lnm=32):
+        starts = [s - 0.1 for s in self.piezo_positions]
+        starts[1] += 0.025
+        ends = [s + 0.1 for s in self.piezo_positions]
+        offset = 0.03
+        samples_x = int(lt * self.sample_rate)
+        d_0 = np.linspace(start=starts[0], stop=ends[0], num=samples_x, endpoint=True)
+        d_1 = starts[0] * np.ones(2000) - offset
+        fast_x = np.concatenate((d_0, d_1))
+        d_2 = np.linspace(start=starts[0] - offset, stop=ends[0] - offset, num=samples_x,
+                          endpoint=True)
+        dx = d_2[1] - d_2[0]
+        d_extension = np.linspace(d_2[-1] + dx, d_2[-1] + offset, num=int(offset / dx), endpoint=True)
+        d_2 = np.concatenate((d_2, d_extension))
+        d_2[:3500] = np.linspace(start=starts[0] - offset, stop=d_2[3500] + 0.025, num=3500, endpoint=True)
+        d_2[3500:] += 0.0025
+        line = np.concatenate((d_2, d_1))
+        for i in range(lnm):
+            fast_x = np.concatenate((fast_x, line))
+        slow_y = np.arange(starts[1], ends[1], step=self.piezo_steps[1])
+        slow_y = slow_y[:lnm]
+        slow_y = np.repeat(slow_y, line.shape[0])
+        slow_y = np.concatenate((np.ones(samples_x + 2000) * starts[1], slow_y))
+        # digital TTL
         cam_sw = self.galvo_sw_states[camera]
         cam_ind = camera + 4
-        lasers = lasers.copy()
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        if interval_samples > self.digital_starts[cam_ind]:
-            offset_samples = interval_samples - self.digital_starts[cam_ind]
-            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
-            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        cycle_samples = self.digital_ends[cam_ind] + max(self.standby_samples, self.return_samples)
-        digital_trigger = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
-        switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_ends[cam_ind]] = 1
-        for ln, laser in enumerate(lasers):
-            digital_trigger[ln, self.digital_starts[laser]:self.digital_ends[laser]] = 1
-        digital_sequences = [np.empty((0,)) for _ in range(len(lasers) + 1)]
-        for i, dtr in enumerate(digital_trigger):
-            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[2])
-        lasers.append(cam_ind)
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = 0.
-        switch_trigger[
-        self.digital_starts[cam_ind] - self.galvo_sw_settle_samples:self.digital_starts[cam_ind]] = smooth_ramp(0.,
-                                                                                                                cam_sw,
-                                                                                                                self.galvo_sw_settle_samples)
-        switch_trigger[
-        self.digital_ends[cam_ind]:self.digital_ends[cam_ind] + self.galvo_sw_settle_samples] = smooth_ramp(cam_sw, 0.,
-                                                                                                            self.galvo_sw_settle_samples)
-        switch_trigger[self.digital_ends[cam_ind] + self.galvo_sw_settle_samples:] = 0.
-        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[2])
-        piezo_sequence = np.repeat(self.piezo_scan_positions[2], cycle_samples)
-        piezo_sequence = shift_array(piezo_sequence, max(self.standby_samples, self.return_samples),
-                                     fill=piezo_sequence[0], direction="backward")
-        return np.asarray(digital_sequences), switch_trigger, piezo_sequence, lasers, self.piezo_scan_pos[2]
+        digital_channels = lasers.copy()
+        initial_offset = max(self.initial_samples, self.galvo_sw_settle_samples)
+        if initial_offset > self.digital_starts[cam_ind]:
+            initial_offset -= self.digital_starts[cam_ind]
+            self.digital_starts = [(_start + initial_offset) for _start in self.digital_starts]
+            self.digital_ends = [(_end + initial_offset) for _end in self.digital_ends]
+        interval_samples = int(self.sample_rate * self.piezo_steps[0] * 10 / (2 / lt))
+        if interval_samples < self.standby_samples + self.exposure_samples:
+            raise Exception("Error: step size is less than the sum of camera exposure and readout")
+        cycle_samples = self.digital_ends[-1] + interval_samples
+        digital_sequences = np.zeros((len(digital_channels) + 1, cycle_samples), dtype=np.uint8)
+        for ln, chl in enumerate(digital_channels):
+            digital_sequences[ln, self.digital_starts[chl]:self.digital_ends[chl]] = 1
+        digital_sequences[-1,
+        self.digital_starts[cam_ind]:self.digital_starts[cam_ind] + self.trigger_pulse_samples] = 1
+        digital_channels.append(cam_ind)
+        switch_galvo = np.ones(cycle_samples) * cam_sw
+        switch_galvo[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] -= 0.25
+        switch_galvo[self.digital_starts[cam_ind] + self.exposure_samples + 1:] -= 0.25
+        digital_sequences = np.tile(digital_sequences, 40)
+        switch_galvo = np.tile(switch_galvo, 40)
+        offset_samples = np.zeros((len(digital_channels), int((0.025 + offset) / (0.2 / samples_x))))
+        digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
+        offset_samples = (cam_sw - 0.25) * np.ones(int((0.025 + offset) / (0.2 / samples_x)))
+        switch_galvo = np.concatenate((offset_samples, switch_galvo))
+        offset_samples = np.zeros((len(digital_channels), line.shape[0] - digital_sequences.shape[1]))
+        digital_sequences = np.concatenate((digital_sequences, offset_samples), axis=1)
+        offset_samples = (cam_sw - 0.25) * np.ones(line.shape[0] - switch_galvo.shape[0])
+        switch_galvo = np.concatenate((switch_galvo, offset_samples))
+        digital_sequences = np.tile(digital_sequences, 32)
+        switch_galvo = np.tile(switch_galvo, 32)
+        offset_samples = np.zeros((len(digital_channels), samples_x + 2000))
+        digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
+        offset_samples = (cam_sw - 0.25) * np.ones(samples_x + 2000)
+        switch_galvo = np.concatenate((offset_samples, switch_galvo))
+        return np.vstack((fast_x, slow_y)), switch_galvo, digital_sequences
 
     def generate_digital_scanning_triggers(self, lasers, camera):
         cam_sw = self.galvo_sw_states[camera]
@@ -406,148 +478,6 @@ class TriggerSequence:
         laser_trigger = np.concatenate((np.zeros(square_wave.size), laser_trigger))
         camera_trigger = np.ones(laser_trigger.shape, dtype=np.int8)
         camera_trigger[:self.samples_delay + square_wave.size] = 0
-        camera_trigger[- self.samples_offset - self.ramp_down_samples:] = 0
-        laser_trigger = np.pad(laser_trigger, (self.galvo_return, fill_samples), 'constant', constant_values=(0, 0))
-        camera_trigger = np.pad(camera_trigger, (self.galvo_return, fill_samples), 'constant', constant_values=(0, 0))
-        tl = self.samples_delay + self.galvo_sw_settle_samples + self.galvo_return
-        self.exposure_samples = camera_trigger.shape[0] - tl
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        # all
-        digital_sequences = [np.empty((0,)) for _ in range(len(lasers) + 1)]
-        galvo_sequences = [np.empty((0,)) for _ in range(3)]
-        for _, las in enumerate(lasers):
-            if las == 0:
-                trig = laser_trigger_act
-                gvf = fast_axis_galvo_act
-                gvs = slow_axis_galvo_act
-                sw = switch_galvo_act
-                cm = camera_trigger_act
-            elif las == 1:
-                itl = int(np.ceil(0.0008 * self.sample_rate))
-                trig = np.pad(np.ones(self.digital_ends[las] - self.digital_starts[las]), (itl, itl), 'constant',
-                              constant_values=(0, 0))
-                gvf = np.ones(trig.shape) * fast_axis_galvo[0]
-                gvs = np.ones(trig.shape) * slow_axis_galvo[0]
-                sw = np.zeros(trig.shape)
-                cm = np.zeros(trig.shape)
-            elif las == 2:
-                itl = int(np.ceil(0.0008 * self.sample_rate))
-                trig = np.pad(np.ones(self.digital_ends[las] - self.digital_starts[las]), (itl, itl), 'constant',
-                              constant_values=(0, 0))
-                gvf = np.ones(trig.shape) * fast_axis_galvo[0]
-                gvs = np.ones(trig.shape) * slow_axis_galvo[0]
-                sw = np.zeros(trig.shape)
-                cm = np.zeros(trig.shape)
-            elif las == 3:
-                trig = laser_trigger
-                gvf = fast_axis_galvo
-                gvs = slow_axis_galvo
-                sw = switch_galvo
-                cm = camera_trigger
-            if (las == 2) and (1 in lasers):
-                for i in range(len(lasers)):
-                    if lasers[i] == 1:
-                        temp = digital_sequences[i]
-                    if lasers[i] == las:
-                        digital_sequences[i] = temp
-            else:
-                galvo_sequences[0] = np.append(galvo_sequences[0], gvf)
-                galvo_sequences[1] = np.append(galvo_sequences[1], gvs)
-                digital_sequences[-1] = np.append(digital_sequences[-1], cm)
-                galvo_sequences[2] = np.append(galvo_sequences[2], sw)
-                for i in range(len(lasers)):
-                    if lasers[i] == las:
-                        digital_sequences[i] = np.append(digital_sequences[i], trig)
-                    else:
-                        digital_sequences[i] = np.append(digital_sequences[i], np.zeros(trig.shape))
-        lasers.append(cam_ind)
-        for i, dtr in enumerate(digital_sequences):
-            digital_sequences[i] = np.append(dtr, dtr[-1] * np.ones(self.standby_samples))
-        for i, gtr in enumerate(galvo_sequences):
-            galvo_sequences[i] = np.append(gtr, gtr[-1] * np.ones(self.standby_samples))
-        return np.asarray(digital_sequences), np.asarray(galvo_sequences), lasers
-
-    def generate_roundtrip_digital_scanning_triggers(self, lasers, camera):
-        cam_sw = self.galvo_sw_states[camera]
-        cam_ind = camera + 4
-        lasers = lasers.copy()
-        lps = int(self.dot_pos_act.size / 2)
-        dot_pos_act = self.dot_pos_act[:lps * 2]
-        if 0 in lasers:
-            # galvo activation
-            ramp_down_act = np.flip(self.ramp_up_act)
-            extended_cycle_act = np.concatenate((self.ramp_up_act, ramp_down_act))
-            fast_axis_galvo_act = np.tile(extended_cycle_act, dot_pos_act.size)
-            slow_axis_galvo_act = np.zeros_like(fast_axis_galvo_act)
-            indices_act = np.arange(self.ramp_up_samples_act + 1, len(fast_axis_galvo_act), ramp_down_act.size)
-            slow_axis_galvo_act[indices_act] = 1
-            slow_axis_galvo_act = np.cumsum(slow_axis_galvo_act) * self.dot_step_y_act + self.dot_starts_act[1]
-            slow_axis_galvo_act[-self.ramp_down_samples_act:] = np.linspace(
-                slow_axis_galvo_act[-self.ramp_down_samples_act], self.dot_starts_act[1], self.ramp_down_samples_act)
-            _sqr_act = np.pad(np.ones(self.samples_high_act), (0, self.samples_low_act), 'constant',
-                              constant_values=(0, 0))
-            square_wave_up_act = np.pad(np.tile(_sqr_act, self.dot_pos_act.size),
-                                        (self.samples_delay_act, self.samples_offset_act), 'constant',
-                                        constant_values=(0, 0))
-            square_wave_down_act = np.pad(np.tile(_sqr_act, self.dot_pos_act.size),
-                                          (self.samples_delay_act + self.ramp_down_offset,
-                                           self.samples_offset_act - self.ramp_down_offset),
-                                          'constant', constant_values=(0, 0))
-            square_wave_act = np.concatenate((square_wave_up_act, square_wave_down_act))
-            laser_trigger_act = np.tile(square_wave_act, self.dot_pos_act.size)
-            fill_samples_act = max(0, self.galvo_sw_settle_samples - self.samples_offset_act)
-            fast_axis_galvo_act = np.pad(fast_axis_galvo_act, (self.galvo_return, fill_samples_act), 'constant',
-                                         constant_values=(self.galvo_starts_act[0], self.galvo_starts_act[0]))
-            slow_axis_galvo_act = np.pad(slow_axis_galvo_act, (self.galvo_return, fill_samples_act), 'constant',
-                                         constant_values=(self.dot_starts_act[1], self.dot_starts_act[1]))
-            if 3 in lasers:
-                fast_axis_galvo_act[-fill_samples_act:] = self.galvo_starts[0]
-                slow_axis_galvo_act[-fill_samples_act:] = self.dot_starts[0]
-                laser_trigger_act = np.pad(laser_trigger_act, (self.galvo_step_response, fill_samples_act), 'constant',
-                                           constant_values=(0, 0))
-                switch_galvo_act = np.zeros(laser_trigger_act.shape)
-                camera_trigger_act = np.zeros(laser_trigger_act.shape)
-            else:
-                switch_galvo_act = np.ones(fast_axis_galvo_act.shape) * cam_sw
-                switch_galvo_act[:self.galvo_sw_settle_samples] = smooth_ramp(0., cam_sw, self.galvo_sw_settle_samples)
-                switch_galvo_act[-self.galvo_sw_settle_samples:] = smooth_ramp(cam_sw, 0., self.galvo_sw_settle_samples)
-                camera_trigger_act = np.ones(laser_trigger_act.shape, dtype=np.int8)
-                camera_trigger_act[:self.samples_delay_act] = 0
-                camera_trigger_act[- self.samples_offset_act - self.ramp_down_samples_act:] = 0
-                laser_trigger_act = np.pad(laser_trigger_act, (self.galvo_return, fill_samples_act), 'constant',
-                                           constant_values=(0, 0))
-                camera_trigger_act = np.pad(camera_trigger_act, (self.galvo_return, fill_samples_act), 'constant',
-                                            constant_values=(0, 0))
-                tl = self.samples_delay_act + self.galvo_sw_settle_samples + self.galvo_return
-                self.exposure_samples = camera_trigger_act.shape[0] - tl
-                self.exposure_time = self.exposure_samples / self.sample_rate
-        else:
-            pass
-        # galvo read out
-        ramp_down = np.linspace(self.ramp_up[-1], self.ramp_up[0], num=self.ramp_down_samples, endpoint=True)
-        extended_cycle = np.concatenate((self.ramp_up, ramp_down))
-        fast_axis_galvo = np.tile(extended_cycle, self.dot_pos.size)
-        slow_axis_galvo = np.zeros_like(fast_axis_galvo)
-        indices = np.arange(self.ramp_up_samples + 1, len(fast_axis_galvo), extended_cycle.size)
-        slow_axis_galvo[indices] = 1
-        slow_axis_galvo = np.cumsum(slow_axis_galvo) * self.dot_step_y + self.dot_starts[1]
-        slow_axis_galvo[-self.ramp_down_samples:] = np.linspace(slow_axis_galvo[-self.ramp_down_samples],
-                                                                self.dot_starts[1], self.ramp_down_samples)
-        fill_samples = max(0, self.galvo_sw_settle_samples - (self.samples_offset + self.ramp_down_samples))
-        fast_axis_galvo = np.pad(fast_axis_galvo, (self.galvo_return, fill_samples), 'constant',
-                                 constant_values=(self.galvo_starts[0], self.galvo_starts[0]))
-        slow_axis_galvo = np.pad(slow_axis_galvo, (self.galvo_return, fill_samples), 'constant',
-                                 constant_values=(self.dot_starts[1], self.dot_starts[1]))
-        switch_galvo = np.ones(fast_axis_galvo.shape) * cam_sw
-        switch_galvo[:self.galvo_sw_settle_samples] = smooth_ramp(0., cam_sw, self.galvo_sw_settle_samples)
-        switch_galvo[-self.galvo_sw_settle_samples:] = smooth_ramp(cam_sw, 0., self.galvo_sw_settle_samples)
-        _sqr = np.pad(np.ones(self.samples_high), (0, self.samples_low), 'constant', constant_values=(0, 0))
-        square_wave = np.pad(np.tile(_sqr, self.dot_pos.size),
-                             (self.samples_delay, self.samples_offset + self.ramp_down_samples), 'constant',
-                             constant_values=(0, 0))
-        laser_trigger = np.tile(square_wave, self.dot_pos.size)
-        camera_trigger = np.ones(laser_trigger.shape, dtype=np.int8)
-        camera_trigger[:self.samples_delay] = 0
         camera_trigger[- self.samples_offset - self.ramp_down_samples:] = 0
         laser_trigger = np.pad(laser_trigger, (self.galvo_return, fill_samples), 'constant', constant_values=(0, 0))
         camera_trigger = np.pad(camera_trigger, (self.galvo_return, fill_samples), 'constant', constant_values=(0, 0))
@@ -770,78 +700,6 @@ class TriggerSequence:
                                                     self.piezo_steps, self.piezo_ranges, scan_pos))
         return (np.asarray(galvo_sequences), np.asarray(piezo_sequences), np.asarray(digital_sequences),
                 lasers, scan_pos)
-
-    def generate_monalisa_scan_2d(self, lasers, camera):
-        cam_sw = self.galvo_sw_states[camera]
-        cam_ind = camera + 4
-        lasers = lasers.copy()
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        if interval_samples > self.digital_starts[cam_ind]:
-            offset_samples = interval_samples - self.digital_starts[cam_ind]
-            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
-            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        cycle_samples = self.digital_ends[cam_ind] + max(self.standby_samples, self.return_samples)
-        digital_trigger = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
-        switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_ends[cam_ind]] = 1
-        for ln, laser in enumerate(lasers):
-            digital_trigger[ln, self.digital_starts[laser]:self.digital_ends[laser]] = 1
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = 0.
-        switch_trigger[
-        self.digital_starts[cam_ind] - self.galvo_sw_settle_samples:self.digital_starts[cam_ind]] = smooth_ramp(0.,
-                                                                                                                cam_sw,
-                                                                                                                self.galvo_sw_settle_samples)
-        switch_trigger[
-        self.digital_ends[cam_ind]:self.digital_ends[cam_ind] + self.galvo_sw_settle_samples] = smooth_ramp(cam_sw, 0.,
-                                                                                                            self.galvo_sw_settle_samples)
-        switch_trigger[self.digital_ends[cam_ind] + self.galvo_sw_settle_samples:] = 0.
-        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[0])
-        digital_sequences = [np.empty((0,)) for _ in range(len(lasers) + 1)]
-        for i, dtr in enumerate(digital_trigger):
-            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[0])
-        lasers.append(cam_ind)
-        piezo_sequences = [np.empty((0,)) for _ in range(2)]
-        piezo_sequences[0] = np.repeat(self.piezo_scan_positions[0], cycle_samples)
-        piezo_sequences[0] = shift_array(piezo_sequences[0], max(self.standby_samples, self.return_samples),
-                                         fill=piezo_sequences[0][0], direction="backward")
-        piezo_sequences[0] = np.tile(piezo_sequences[0], self.piezo_scan_pos[1])
-        piezo_sequences[1] = np.repeat(self.piezo_scan_positions[1], cycle_samples * self.piezo_scan_pos[0])
-        piezo_sequences[1] = shift_array(piezo_sequences[1], max(self.standby_samples, self.return_samples),
-                                         fill=piezo_sequences[1][0], direction="backward")
-        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[1])
-        for i, dtr in enumerate(digital_sequences):
-            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[1])
-        return (np.asarray(digital_sequences), np.asarray(piezo_sequences), switch_trigger,
-                lasers, self.piezo_scan_pos[2])
-
-    def generate_piezo_line_scan(self, lasers, camera):
-        cam_sw = self.galvo_sw_states[camera]
-        lasers = lasers.copy()
-        cam_ind = camera + 4
-        scan_samples = int(0.064 * self.sample_rate)
-        interval_samples = int(0.016 * self.sample_rate)
-        piezo_sequences = [np.empty((0,)) for _ in range(2)]
-        temp = np.concatenate((smooth_ramp(1.0, 9.0, scan_samples, 0.9), smooth_ramp(9.0, 1.0, scan_samples, 0.9)))
-        piezo_sequences[0] = np.pad(temp,
-                                    (self.initial_samples, 2 * scan_samples + interval_samples + self.standby_samples),
-                                    'constant', constant_values=(1, 1))
-        piezo_sequences[1] = np.pad(temp,
-                                    (self.initial_samples + 2 * scan_samples + interval_samples, self.standby_samples),
-                                    'constant', constant_values=(1, 1))
-        cycle_samples = 4 * scan_samples + self.initial_samples + interval_samples + self.standby_samples
-        switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
-        switch_trigger[:self.initial_samples - self.galvo_sw_settle_samples] = 0.
-        switch_trigger[-self.standby_samples:] = 0.
-        digital_triggers = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
-        digital_triggers[-1, self.initial_samples:] = 1
-        digital_triggers[-1, -self.standby_samples:] = 0
-        for ln, laser in enumerate(lasers):
-            digital_triggers[ln, self.initial_samples:self.initial_samples + 2 * scan_samples] = 1
-            digital_triggers[ln, -2 * scan_samples - self.standby_samples:- self.standby_samples] = 1
-        lasers.append(cam_ind)
-        return digital_triggers, switch_trigger, np.asarray(piezo_sequences), lasers
 
     def update_lightsheet_rolling(self, interval_line_number):
         self.line_interval_samples = int(np.ceil(((
@@ -1085,51 +943,6 @@ class TriggerSequence:
                                                      self.dot_ranges, self.dot_pos.size], self.piezo_starts,
                                                     self.piezo_steps, self.piezo_ranges, scan_pos))
         return np.asarray(galvo_sequences), np.asarray(piezo_sequences), np.asarray(digital_sequences), lasers, scan_pos
-
-    def generate_point_scan_resolft_2d(self, lasers, camera):
-        cam_sw = self.galvo_sw_states[camera]
-        cam_ind = camera + 4
-        lasers = lasers.copy()
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        if interval_samples > self.digital_starts[cam_ind]:
-            offset_samples = interval_samples - self.digital_starts[cam_ind]
-            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
-            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        cycle_samples = self.digital_ends[cam_ind] + max(self.standby_samples, self.return_samples)
-        digital_trigger = np.zeros((len(lasers) + 1, cycle_samples), dtype=np.int8)
-        switch_trigger = cam_sw * np.ones(cycle_samples, dtype=np.float16)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        digital_trigger[-1, self.digital_starts[cam_ind]:self.digital_ends[cam_ind]] = 1
-        for ln, laser in enumerate(lasers):
-            digital_trigger[ln, self.digital_starts[laser]:self.digital_ends[laser]] = 1
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = 0.
-        switch_trigger[
-        self.digital_starts[cam_ind] - self.galvo_sw_settle_samples:self.digital_starts[cam_ind]] = smooth_ramp(0.,
-                                                                                                                cam_sw,
-                                                                                                                self.galvo_sw_settle_samples)
-        switch_trigger[
-        self.digital_ends[cam_ind]:self.digital_ends[cam_ind] + self.galvo_sw_settle_samples] = smooth_ramp(cam_sw, 0.,
-                                                                                                            self.galvo_sw_settle_samples)
-        switch_trigger[self.digital_ends[cam_ind] + self.galvo_sw_settle_samples:] = 0.
-        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[0])
-        digital_sequences = [np.empty((0,)) for _ in range(len(lasers) + 1)]
-        for i, dtr in enumerate(digital_trigger):
-            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[0])
-        lasers.append(cam_ind)
-        piezo_sequences = [np.empty((0,)) for _ in range(2)]
-        piezo_sequences[0] = np.repeat(self.piezo_scan_positions[0], cycle_samples)
-        piezo_sequences[0] = shift_array(piezo_sequences[0], max(self.standby_samples, self.return_samples),
-                                         fill=piezo_sequences[0][0], direction="backward")
-        piezo_sequences[0] = np.tile(piezo_sequences[0], self.piezo_scan_pos[1])
-        piezo_sequences[1] = np.repeat(self.piezo_scan_positions[1], cycle_samples * self.piezo_scan_pos[0])
-        piezo_sequences[1] = shift_array(piezo_sequences[1], max(self.standby_samples, self.return_samples),
-                                         fill=piezo_sequences[1][0], direction="backward")
-        switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[1])
-        for i, dtr in enumerate(digital_sequences):
-            digital_sequences[i] = np.tile(dtr, self.piezo_scan_pos[1])
-        return (np.asarray(digital_sequences), np.asarray(piezo_sequences), switch_trigger,
-                lasers, self.piezo_scan_pos[2])
 
 
 def smooth_ramp(start, end, samples, curve_half=0.02):

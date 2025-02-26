@@ -156,7 +156,19 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    def set_readout_rate(self, va=2, hs=0, vs=0):
+    def set_single_track(self):
+        """Need shutter to prevent light falling outside the selected lines"""
+        ret = self.sdk.SetReadMode(3)
+        if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+            ret = self.sdk.SetSingleTrack(512, 32)
+            if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+                self.logg.info("Set Readout Mode to {}".format(Readout_Mode[3]))
+            else:
+                self.logg.error(atmcd_errors.Error_Codes(ret))
+        else:
+            self.logg.error(atmcd_errors.Error_Codes(ret))
+
+    def set_readout_rate(self, va=0, hs=0, vs=0):
         ret = self.sdk.SetVSAmplitude(va)
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("Vertical Clock Voltage {}  ".format(va))
@@ -301,10 +313,13 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    def prepare_live(self):
-        self.set_readout_mode(4)
-        self.set_acquisition_mode(5)
-        self.set_trigger_mode(7)
+    def prepare_live(self, rd=4, aq=5, tr=1):
+        self.set_readout_mode(rd)
+        self.set_roi()
+        self.set_acquisition_mode(aq)
+        self.set_trigger_mode(tr)
+        self.set_exposure_time()
+        self.set_gain()
         self.set_kinetic_cycle_time(0)
         self.get_acquisition_timings()
         self.get_buffer_size()
@@ -351,10 +366,13 @@ class EMCCDCamera:
         else:
             return None
 
-    def prepare_data_acquisition(self):
-        self.set_readout_mode(4)
-        self.set_acquisition_mode(5)
-        self.set_trigger_mode(7)
+    def prepare_data_acquisition(self, rd=4, aq=5, tr=1):
+        self.set_readout_mode(rd)
+        self.set_roi()
+        self.set_acquisition_mode(aq)
+        self.set_trigger_mode(tr)
+        self.set_exposure_time()
+        self.set_gain()
         self.set_kinetic_cycle_time(0)
         self.get_acquisition_timings()
         self.get_buffer_size()

@@ -27,7 +27,8 @@ class NIDAQ:
             self.mode = None
 
     def __init__(self, logg=None):
-        self.logg = logg or self.setup_logging()
+        self.logg = logg or s
+        elf.setup_logging()
         self.devices = self._initialize()
         self._settings = self.NIDAQSettings()
         self.tasks = {}
@@ -370,16 +371,19 @@ class NIDAQ:
                 _task = None
         self._active = {key: False for key in self._active}
 
-    def measure_ao(self, output_channel, input_channel, data, clk="/Dev1/ao/SampleClock"):
-        num_samples = data.shape[0]
-        acquired_data = np.zeros(num_samples)
+    def measure_ao(self, output_channels, input_channels, data, clk="/Dev1/ao/SampleClock"):
+        if data.ndim > 1:
+            _, num_samples = data.shape
+        else:
+            num_samples = data.shape[0]
+        acquired_data = np.zeros(data.shape)
         with nidaqmx.Task() as output_task:
-            output_task.ao_channels.add_ao_voltage_chan(output_channel, min_val=-10., max_val=10.)
+            output_task.ao_channels.add_ao_voltage_chan(output_channels, min_val=-10., max_val=10.)
             output_task.timing.cfg_samp_clk_timing(rate=self.sample_rate,
                                                    sample_mode=AcquisitionType.FINITE,
                                                    samps_per_chan=num_samples)
             with nidaqmx.Task() as input_task:
-                input_task.ai_channels.add_ai_voltage_chan(input_channel, min_val=-10., max_val=10.)
+                input_task.ai_channels.add_ai_voltage_chan(input_channels, min_val=-10., max_val=10.)
                 input_task.timing.cfg_samp_clk_timing(rate=self.sample_rate,
                                                       sample_mode=AcquisitionType.FINITE,
                                                       samps_per_chan=num_samples,
