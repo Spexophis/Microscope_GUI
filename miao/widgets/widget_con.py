@@ -93,9 +93,9 @@ class ConWidget(QtWidgets.QWidget):
         self.QSpinBox_emccd_coordinate_binx = cw.SpinBoxWidget(0, 1024, 1, 1)
         self.QSpinBox_emccd_coordinate_biny = cw.SpinBoxWidget(0, 1024, 1, 1)
         self.QSpinBox_emccd_gain = cw.SpinBoxWidget(0, 300, 1, 0)
-        self.QDoubleSpinBox_emccd_t_clean = cw.DoubleSpinBoxWidget(0, 10, 0.001, 3, 0.009)
+        self.QDoubleSpinBox_emccd_t_clean = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.009)
         self.QDoubleSpinBox_emccd_exposure_time = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.001)
-        self.QDoubleSpinBox_emccd_t_standby = cw.DoubleSpinBoxWidget(0, 10, 0.001, 3, 0.050)
+        self.QDoubleSpinBox_emccd_t_standby = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.050)
         self.QDoubleSpinBox_emccd_gvs = cw.DoubleSpinBoxWidget(-5., 5., 0.01, 2, 5.)
         self.emccd_scroll_area, emccd_scroll_layout = cw.create_scroll_area()
         emccd_scroll_layout.addRow(cw.LabelWidget(str('EMCCD')))
@@ -467,7 +467,8 @@ class ConWidget(QtWidgets.QWidget):
         layout_acquisition = QtWidgets.QGridLayout()
         self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Wide Field 3D",
                                                                          "Monalisa Scan 2D", "Monalisa Scan 3D",
-                                                                         "Dot Scan 2D", "Dot Scan 3D"])
+                                                                         "Dot Scan 2D", "Dot Scan 3D",
+                                                                         "Point Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)
         self.QPushButton_alignment = cw.PushButtonWidget('Alignment')
         self.QPushButton_acquire = cw.PushButtonWidget('Acquire')

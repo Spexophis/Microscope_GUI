@@ -27,8 +27,8 @@ class NIDAQ:
             self.mode = None
 
     def __init__(self, logg=None):
-        self.logg = logg or s
-        elf.setup_logging()
+        self.logg = logg or self.setup_logging()
+        self.setup_logging()
         self.devices = self._initialize()
         self._settings = self.NIDAQSettings()
         self.tasks = {}

@@ -81,17 +81,17 @@ class EMCCDCamera:
         try:
             self.get_sn()
             self.cooler_on()
-            # self.set_frame_transfer(0)
+            self.set_frame_transfer(0)
             self.set_readout_rate(2, 0, 0)
         except Exception as e:
             self.logg.error(f"Error configuring camera: {e}")
 
     def close(self):
         self.cooler_off()
-        self.get_ccd_temperature()
-        while self.temperature <= 0:
-            time.sleep(1)
-            self.get_ccd_temperature()
+        # self.get_ccd_temperature()
+        # while self.temperature <= 0:
+        #     time.sleep(2)
+        #     self.get_ccd_temperature()
         ret = self.sdk.ShutDown()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("Andor EMCCD Shut Down")
@@ -156,11 +156,11 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    def set_single_track(self):
+    def set_single_track(self, center=512, width=64):
         """Need shutter to prevent light falling outside the selected lines"""
         ret = self.sdk.SetReadMode(3)
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
-            ret = self.sdk.SetSingleTrack(512, 32)
+            ret = self.sdk.SetSingleTrack(centre=center, height=width)
             if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
                 self.logg.info("Set Readout Mode to {}".format(Readout_Mode[3]))
             else:
@@ -313,7 +313,7 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    def prepare_live(self, rd=4, aq=5, tr=1):
+    def prepare_live(self, rd=4, aq=5, tr=7):
         self.set_readout_mode(rd)
         self.set_roi()
         self.set_acquisition_mode(aq)
@@ -366,7 +366,7 @@ class EMCCDCamera:
         else:
             return None
 
-    def prepare_data_acquisition(self, rd=4, aq=5, tr=1):
+    def prepare_data_acquisition(self, rd=4, aq=5, tr=7):
         self.set_readout_mode(rd)
         self.set_roi()
         self.set_acquisition_mode(aq)

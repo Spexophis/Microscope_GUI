@@ -1,6 +1,8 @@
 import copy
 import ctypes as ct
-
+import glob
+import os
+import json
 import numpy as np
 from PIL import Image
 
@@ -11,8 +13,11 @@ class LCOS:
         self.logg = logg or self.setup_logging()
         self.config = config or self.load_configs()
         lib = self.config.configs["Spatial Light Modulator"]["Hamamatsu"]["ControlLibrary"]
+        self.correction_pattern, self.correction_value = self.load_pre_calibrations()
         self.lcos_lib = ct.windll.LoadLibrary(lib)
         self.pitch = 1  # pixel pitch (0: 20um 1: 1.25um)
+        #
+        self.wavelength = "488nm"
         # SLM pixel numbers
         self.x = 1272
         self.y = 1024
@@ -23,11 +28,11 @@ class LCOS:
         self.xShift = 0
         self.yShift = 0
         # make the 8bit unsigned integer array type
-        farr = ct.c_uint8 * self.array_size
+        self.farr = ct.c_uint8 * self.array_size
         # make the 8bit unsigned integer array instance
-        self.farray = farr(0)
-        self.farray2 = farr(0)
-        self.farray3 = farr(0)
+        self.farray = self.farr(0)
+        self.farray2 = self.farr(0)
+        self.farray3 = self.farr(0)
 
     @staticmethod
     def setup_logging():
@@ -43,9 +48,24 @@ class LCOS:
         return cfg
 
     def close(self):
-        self.stop_display(self.windowNo)
+        self.stop_display()
 
-    def show_on_display(self, monitorNo, windowNo, x, xShift, y, yShift, array):
+    def load_pre_calibrations(self):
+        fd = self.config.configs["Spatial Light Modulator"]["Hamamatsu"]["CorrectionPatterns"]
+        bmp_files = glob.glob(f"{fd}/*.bmp")
+        patterns = {}
+        for file in bmp_files:
+            filename = os.path.basename(file)
+            if filename.endswith(".bmp"):
+                name = filename.split('_')[-1].replace('.bmp', '')
+                img = Image.open(file)
+                patterns[name] = np.array(img)
+        fd = self.config.configs["Spatial Light Modulator"]["Hamamatsu"]["WavelengthTable"]
+        with open(fd, "r") as json_file:
+            wl_table = json.load(json_file)
+        return patterns, wl_table
+
+    def show_on_display(self, array):
         """
         the function for showing on LCOS display
         int monitorNo:
@@ -60,18 +80,25 @@ class LCOS:
         window_settings = self.lcos_lib.Window_Settings
         window_settings.argtypes = [ct.c_int, ct.c_int, ct.c_int, ct.c_int]
         window_settings.restype = ct.c_int
-        window_settings(monitorNo, windowNo, xShift, yShift)
+        window_settings(self.monitorNo, self.windowNo, self.xShift, self.yShift)
+        # correct pattern
+        p = array + self.correction_pattern[self.wavelength]
+        p = p % 256
+        p = p * self.correction_value[self.wavelength] / 255
+        p = p.astype(np.uint8)
+        c_array = self.farr(*p.ravel())
         # Show pattern
         window_array_to_display = self.lcos_lib.Window_Array_to_Display
         window_array_to_display.argtypes = [ct.c_void_p, ct.c_int, ct.c_int, ct.c_int, ct.c_int]
         window_array_to_display.restype = ct.c_int
-        window_array_to_display(array, x, y, windowNo, x * y)
+        window_array_to_display(c_array, self.x, self.y, self.windowNo, self.x * self.y)
+        return p
 
-    def stop_display(self, windowNo):
+    def stop_display(self):
         window_term = self.lcos_lib.Window_Term
         window_term.argtyes = [ct.c_int]
         window_term.restype = ct.c_int
-        window_term(windowNo)
+        window_term(self.windowNo)
 
     def display_axicon_lens(self, top=10.0):
         self.make_axicon_lens(top, self.pitch, self.x, self.y, self.farray)

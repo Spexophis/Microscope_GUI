@@ -2,6 +2,7 @@ import os
 import time
 import traceback
 import uuid
+
 import numpy as np
 import pandas as pd
 import tifffile as tf
@@ -151,10 +152,10 @@ class MainController(QtCore.QObject):
 
             self.laser_lists = ["405", "488_0", "488_1", "488_2"]
 
-            self.magnifications = [196.875, 1., 1., 1.]
+            self.magnifications = [189, 1., 1., 1.]
             self.pixel_sizes = []
             self.pixel_sizes = [self.m.cam_set[i].ps / mag for i, mag in enumerate(self.magnifications)]
-            self.pixel_sizes[0] = 0.081
+            self.pixel_sizes[0] = 0.068783
             self.magnifications[0] = self.m.cam_set[0].ps / self.pixel_sizes[0]
 
             self.dm_cmd_ind = {}
@@ -426,6 +427,7 @@ class MainController(QtCore.QObject):
         self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
 
     def update_trigger_parameters(self, cam_key):
+        """Ensure that the camera acquisition is fully set up before executing this function."""
         try:
             digital_starts, digital_ends = self.con_controller.get_digital_parameters()
             self.p.trigger.update_digital_parameters(digital_starts, digital_ends)
@@ -436,7 +438,6 @@ class MainController(QtCore.QObject):
             return_time = self.con_controller.get_piezo_return_time()
             self.p.trigger.update_piezo_scan_parameters(axis_lengths, step_sizes, positions, return_time)
             self.p.trigger.update_camera_parameters(initial_time=self.m.cam_set[self.cameras[cam_key]].t_clean,
-                                                    exposure_time=self.m.cam_set[self.cameras[cam_key]].t_exposure,
                                                     standby_time=self.m.cam_set[self.cameras[cam_key]].t_readout,
                                                     cycle_time=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
             if self.cameras[cam_key] == 0:
@@ -474,7 +475,9 @@ class MainController(QtCore.QObject):
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                       clean=self.p.trigger.initial_time,
+                                                       standby=self.p.trigger.standby_time)
         if vd_mod == "Dot Scan":
             if self.cameras["imaging"] == 1:
                 if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
@@ -492,7 +495,9 @@ class MainController(QtCore.QObject):
                 dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
                 self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
                                           digital_sequences=dtr, digital_channels=chs, finite=False)
-                self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+                self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                           clean=self.p.trigger.initial_time,
+                                                           standby=self.p.trigger.standby_time)
         if vd_mod == "Scan Calib":
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
@@ -644,7 +649,9 @@ class MainController(QtCore.QObject):
         elif acq_mod == "Monalisa Scan 2D":
             self.run_monalisa_scan(acq_num)
         elif acq_mod == "Dot Scan 2D":
-            self.run_dot_scanning(acq_num)
+            self.run_dot_scan(acq_num)
+        elif acq_mod == "Point Scan 2D":
+            self.run_point_scan(acq_num)
         else:
             self.logg.error(f"Invalid video mode")
 
@@ -668,7 +675,9 @@ class MainController(QtCore.QObject):
         dtr, sw, dch = self.generate_live_triggers("imaging")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
         self.m.cam_set[self.cameras["focus_lock"]].set_exposure(self.con_controller.get_tis_expo())
         self.m.cam_set[self.cameras["focus_lock"]].prepare_live()
 
@@ -797,7 +806,9 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
 
     def widefield_zstack(self):
         try:
@@ -832,7 +843,7 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
 
-    def prepare_dot_scanning(self):
+    def prepare_dot_scan(self):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
@@ -844,11 +855,13 @@ class MainController(QtCore.QObject):
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
                                   galvo_sequences=gtr, galvo_channels=[0, 1, 2],
                                   digital_sequences=dtr, digital_channels=chs)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
 
-    def dot_scanning(self):
+    def dot_scan(self):
         try:
-            self.prepare_dot_scanning()
+            self.prepare_dot_scan()
         except Exception as e:
             self.logg.error(f"Error preparing galvo scanning: {e}")
             return
@@ -865,12 +878,12 @@ class MainController(QtCore.QObject):
                        metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
                                  'DM cmd': self.dm_cmd_ind})
         except Exception as e:
-            self.finish_dot_scanning()
+            self.finish_dot_scan()
             self.logg.error(f"Error running dot scanning: {e}")
             return
-        self.finish_dot_scanning()
+        self.finish_dot_scan()
 
-    def finish_dot_scanning(self):
+    def finish_dot_scan(self):
         try:
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
@@ -879,9 +892,59 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Error stopping dot scanning: {e}")
 
-    def run_dot_scanning(self, n: int):
+    def run_dot_scan(self, n: int):
         self.v.get_dialog()
-        self.run_task(task=self.dot_scanning, iteration=n)
+        self.run_task(task=self.dot_scan, iteration=n)
+
+    def prepare_point_scan(self):
+        self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.update_trigger_parameters("imaging")
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers, self.cameras["imaging"])
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+                                  galvo_sequences=sw, galvo_channels=[2],
+                                  digital_sequences=dtr, digital_channels=dch)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
+
+    def point_scan(self):
+        try:
+            self.prepare_point_scan()
+        except Exception as e:
+            self.logg.error(f"Error preparing monalisa scanning: {e}")
+            return
+        try:
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            time.sleep(0.02)
+            self.m.daq.run_triggers()
+            time.sleep(1.)
+            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_monalisa_scanning.tif')
+            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
+                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
+                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
+        except Exception as e:
+            self.finish_monalisa_scan()
+            self.logg.error(f"Error running monalisa scanning: {e}")
+            return
+        self.finish_monalisa_scan()
+
+    def finish_point_scan(self):
+        try:
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.m.daq.stop_triggers()
+            self.lasers_off()
+            self.logg.info("Monalisa scanning image acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping monalisa scanning: {e}")
+
+    def run_point_scan(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.point_scan, iteration=n)
 
     def prepare_monalisa_scan(self):
         self.lasers = self.con_controller.get_lasers()
@@ -895,7 +958,9 @@ class MainController(QtCore.QObject):
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   galvo_sequences=sw, galvo_channels=[2],
                                   digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
 
     def monalisa_scan_2d(self):
         try:
@@ -1069,7 +1134,9 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters("imaging")
         dtr, sw, dch = self.generate_live_triggers("imaging")
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
 
     def grid_pattern_scan(self):
         try:
@@ -1512,12 +1579,16 @@ class MainController(QtCore.QObject):
             dtr, sw, dch = self.generate_live_triggers("imaging")
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                       clean=self.p.trigger.initial_time,
+                                                       standby=self.p.trigger.standby_time)
         elif vd_mod == "Dot Scan":
             dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
             self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
                                       digital_sequences=dtr, digital_channels=chs)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time)
+            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                       clean=self.p.trigger.initial_time,
+                                                       standby=self.p.trigger.standby_time)
         else:
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.lasers_off()
@@ -1583,7 +1654,7 @@ class MainController(QtCore.QObject):
                 if mf == "HighPass(FFT)":
                     mts = [ipr.hpf(img, hpr) for img in images]
                 if mf == "Selected(FFT)":
-                    mts = [ipr.selected_frequency(img, [slf, 2*slf]) for img in images]
+                    mts = [ipr.selected_frequency(img, [slf, 2 * slf]) for img in images]
                 std = np.std(mts)
                 fn = new_folder + r"\original.tiff"
                 tf.imwrite(str(fn), np.asarray(images))
@@ -1609,7 +1680,7 @@ class MainController(QtCore.QObject):
                 if mf == "HighPass(FFT)":
                     mts = [ipr.hpf(img, hpr) for img in images]
                 if mf == "Selected(FFT)":
-                    mts = [ipr.selected_frequency(img, [slf, 2*slf]) for img in images]
+                    mts = [ipr.selected_frequency(img, [slf, 2 * slf]) for img in images]
                 self.logg.info(f"zernike mode #{mode}, ({amprange}), ({mts})")
                 self.sig_plt.emit(amprange, mts)
                 if err:

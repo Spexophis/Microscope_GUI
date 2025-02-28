@@ -18,13 +18,16 @@ def generate_binary_phase_1bit(size=(2048, 1536), period=(8, 0), value=255, typ=
     return np.where(((xx % period_x) < (period_x // 2)) ^ ((yy % period_y) < (period_y // 2)), value, 0).astype(typ)
 
 
-def generate_binary_phase_8bit(size=(2048, 1536), periods=(8, 0), typ=np.uint8):
-    width, height = size
+def generate_binary_phase_8bit(bit_indices, bit_sequences):
+    if len(bit_sequences) != len(bit_indices):
+        raise Exception("Error: bit index and bit sequence length does not match")
+    width, height = bit_sequences[0].shape
     patterns = np.zeros((8, width, height))
-    pattern = np.zeros((width, height))
+    pattern = np.zeros((width, height), dtype=np.uint8)
+    for i, bn in enumerate(bit_indices):
+        patterns[bn] = bit_sequences[i]
     for i in range(8):
-        pattern += patterns[i] * 2 ** i
-    # pattern = pattern_7 * 2 ** 0 + pattern_6 * 2 ** 1 + pattern_2 * 2 ** 2 + pattern_3 * 3 ** 2 + pattern_4 * 2 ** 4 + pattern_5 * 2 ** 5 + pattern_6 * 2 ** 6 + pattern_7 * 2 ** 7
+        pattern += patterns[i] * (2 ** i)
     return pattern
 
 
@@ -35,3 +38,27 @@ def save_to_bmp(data, svd, fn, bt=1):
         img.save(svd + fn + r"_1bit.bmp", format='BMP')
     else:
         img.save(svd + fn + r"_8bit.bmp", format='BMP')
+
+
+def generate_split_grating(beam_num=5, spacing=32, pixel_nums=(1024, 1272), iterations=500, binary=True):
+    cent_x, cent_y = pixel_nums[0] // 2, pixel_nums[1] // 2
+    beam_positions = []
+    offsets = np.linspace(start=-int(spacing * int(np.floor(beam_num / 2))),
+                          stop=int(spacing * int(np.floor(beam_num / 2))),
+                          num=beam_num, dtype=int)
+    for r_off in offsets:
+        for c_off in offsets:
+            beam_positions.append((cent_x + r_off, cent_y + c_off))
+    field = np.random.choice([1, -1], size=pixel_nums)
+    target = np.zeros(pixel_nums, dtype=float)
+    for pos in beam_positions:
+        r, c = pos
+        target[r, c] = 1.0
+    for _ in range(iterations):
+        far_field = np.fft.fftshift(np.fft.fft2(field))
+        phase_far = np.exp(1j * np.angle(far_field))
+        far_field_new = target * phase_far
+        field_new = np.fft.ifft2(np.fft.ifftshift(far_field_new))
+        if binary:
+            field = np.where(np.real(field_new) >= 0, 1, -1)
+    return field

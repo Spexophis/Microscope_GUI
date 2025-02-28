@@ -45,15 +45,15 @@ class MainModule:
                                                                         config=self.config, path=self.data_folder)
             except Exception as e:
                 self.logg.error_log.error(f"{e}")
-        self.slm = {}
-        try:
-            self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
-        try:
-            self.slm["Phase"] = module_slm_lcos.LCOS(logg=self.logg.error_log, config=self.config)
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
+        # self.slm = {}
+        # try:
+        #     self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
+        # except Exception as e:
+        #     self.logg.error_log.error(f"{e}")
+        # try:
+        #     self.slm["Phase"] = module_slm_lcos.LCOS(logg=self.logg.error_log, config=self.config)
+        # except Exception as e:
+        #     self.logg.error_log.error(f"{e}")
         try:
             self.laser = module_coboltlaser.CoboltLaser(logg=self.logg.error_log, config=self.config)
         except Exception as e:
