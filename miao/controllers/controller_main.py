@@ -659,9 +659,9 @@ class MainController(QtCore.QObject):
     def save_data(self, tm: str, d: np.ndarray, idx: list):
         fn = self.v.get_file_dialog()
         if fn is not None:
-            fd = fn + '_' + tm + '.tif'
+            fd = fn + '_' + tm + '.tiff'
         else:
-            fd = os.path.join(self.data_folder, tm + '.tif')
+            fd = os.path.join(self.data_folder, tm + '.tiff')
         tf.imwrite(fd, d, imagej=True, resolution=(
             1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
                    metadata={'unit': 'um', 'indices': idx})
@@ -798,12 +798,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
         dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
         self.set_piezo_position_z(self.p.trigger.piezo_scan_positions[2][0])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
@@ -848,10 +848,10 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotscan_resolft_2d(self.lasers, self.cameras["imaging"])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
                                   galvo_sequences=gtr, galvo_channels=[0, 1, 2],
                                   digital_sequences=dtr, digital_channels=chs)
@@ -901,12 +901,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
-        self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers, self.cameras["imaging"])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.update_trigger_parameters("imaging")
+        ptr, sw, dtr, dch, pch, gch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers, self.cameras["imaging"])
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  galvo_sequences=sw, galvo_channels=[2],
+                                  galvo_sequences=sw, galvo_channels=gch,
                                   digital_sequences=dtr, digital_channels=dch)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
                                                    clean=self.p.trigger.initial_time,
@@ -916,7 +916,7 @@ class MainController(QtCore.QObject):
         try:
             self.prepare_point_scan()
         except Exception as e:
-            self.logg.error(f"Error preparing monalisa scanning: {e}")
+            self.logg.error(f"Error preparing point scanning: {e}")
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
@@ -929,7 +929,7 @@ class MainController(QtCore.QObject):
                        metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
         except Exception as e:
             self.finish_monalisa_scan()
-            self.logg.error(f"Error running monalisa scanning: {e}")
+            self.logg.error(f"Error running point scanning: {e}")
             return
         self.finish_monalisa_scan()
 
@@ -938,9 +938,9 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
-            self.logg.info("Monalisa scanning image acquired")
+            self.logg.info("Point scanning image acquired")
         except Exception as e:
-            self.logg.error(f"Error stopping monalisa scanning: {e}")
+            self.logg.error(f"Error stopping point scanning: {e}")
 
     def run_point_scan(self, n: int):
         self.v.get_dialog()
@@ -951,10 +951,10 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   galvo_sequences=sw, galvo_channels=[2],
                                   digital_sequences=dtr, digital_channels=dch)

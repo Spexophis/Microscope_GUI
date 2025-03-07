@@ -1,6 +1,6 @@
 from miao.modules import module_andorixon
 from miao.modules import module_deformablemirror
-from miao.modules import module_hamamatsu
+from miao.modules import module_hamamatsuorchflash
 from miao.modules import module_thorlabcam
 from miao.modules import module_slm_qxga
 from miao.modules import module_slm_lcos
@@ -24,7 +24,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.scmoscam = module_hamamatsu.HamamatsuCameraMR(logg=self.logg.error_log)
+            self.scmoscam = module_hamamatsuorchflash.HamamatsuCamera(logg=self.logg.error_log)
             self.cam_set[1] = self.scmoscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")

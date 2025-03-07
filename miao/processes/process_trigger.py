@@ -343,25 +343,25 @@ class TriggerSequence:
         for ln, chl in enumerate(digital_channels):
             digital_sequences[ln, self.digital_starts[chl]:self.digital_ends[chl]] = 1
         switch_galvo = np.ones(cycle_samples) * cam_sw
-        switch_galvo[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] -= 0.25
-        switch_galvo[self.digital_ends[cam_ind] + 1:] -= 0.25
+        switch_galvo[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
+        switch_galvo[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
         digital_sequences = np.tile(digital_sequences, 40)
         switch_galvo = np.tile(switch_galvo, 40)
         offset_samples = np.zeros((len(digital_channels), int((0.025 + offset) / (0.2 / samples_x))))
         digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
-        offset_samples = (cam_sw - 0.25) * np.ones(int((0.025 + offset) / (0.2 / samples_x)))
+        offset_samples = self.galvo_sw_states[2] * np.ones(int((0.025 + offset) / (0.2 / samples_x)))
         switch_galvo = np.concatenate((offset_samples, switch_galvo))
         offset_samples = np.zeros((len(digital_channels), line.shape[0] - digital_sequences.shape[1]))
         digital_sequences = np.concatenate((digital_sequences, offset_samples), axis=1)
-        offset_samples = (cam_sw - 0.25) * np.ones(line.shape[0] - switch_galvo.shape[0])
+        offset_samples = self.galvo_sw_states[2] * np.ones(line.shape[0] - switch_galvo.shape[0])
         switch_galvo = np.concatenate((switch_galvo, offset_samples))
         digital_sequences = np.tile(digital_sequences, 32)
         switch_galvo = np.tile(switch_galvo, 32)
         offset_samples = np.zeros((len(digital_channels), samples_x + 2000))
         digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
-        offset_samples = (cam_sw - 0.25) * np.ones(samples_x + 2000)
+        offset_samples = self.galvo_sw_states[2] * np.ones(samples_x + 2000)
         switch_galvo = np.concatenate((offset_samples, switch_galvo))
-        return np.vstack((fast_x, slow_y)), switch_galvo, digital_sequences
+        return np.vstack((fast_x, slow_y)), switch_galvo, digital_sequences, digital_channels, [0, 1], [2], 32 * 40
 
     def generate_piezo_scan_ramp_1um(self):
         lt = 0.25

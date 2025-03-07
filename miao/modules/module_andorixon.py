@@ -314,19 +314,18 @@ class EMCCDCamera:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
     def prepare_live(self, rd=4, aq=5, tr=7):
-        self.set_readout_mode(rd)
-        self.set_roi()
         self.set_acquisition_mode(aq)
+        self.set_readout_mode(rd)
         self.set_trigger_mode(tr)
-        self.set_exposure_time()
+        self.set_roi()
         self.set_gain()
         self.set_kinetic_cycle_time(0)
         self.get_acquisition_timings()
         self.get_buffer_size()
-        self.data = DataList(self.buffer_size)
-        self.acq_thread = AcquisitionThread(self)
 
     def start_live(self):
+        self.data = DataList(self.buffer_size)
+        self.acq_thread = AcquisitionThread(self)
         ret = self.sdk.StartAcquisition()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.acq_thread.start()
@@ -353,12 +352,8 @@ class EMCCDCamera:
             if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
                 self.valid_index = valid_last
                 data_array = np.split(data_array.reshape(num, self.img_size).astype(np.uint16), num, axis=0)
-                data_array = [subarray.reshape(self.pixels_x, self.pixels_y) for subarray in data_array]
+                data_array = [subarray.reshape(self.pixels_y, self.pixels_x) for subarray in data_array]
                 self.data.add_element(data_array, valid_first, valid_last)
-            # else:
-            #     self.logg.error(atmcd_errors.Error_Codes(ret))
-        # else:
-        #     self.logg.error(atmcd_errors.Error_Codes(ret))
 
     def get_last_image(self):
         if self.data is not None:
@@ -371,18 +366,14 @@ class EMCCDCamera:
         self.set_roi()
         self.set_acquisition_mode(aq)
         self.set_trigger_mode(tr)
-        self.set_exposure_time()
         self.set_gain()
         self.set_kinetic_cycle_time(0)
         self.get_acquisition_timings()
         self.get_buffer_size()
-        if self.buffer_size < self.acq_num:
-            self.data = DataList(self.acq_num)
-        else:
-            self.data = DataList(self.buffer_size)
-        self.acq_thread = AcquisitionThread(self)
 
     def start_data_acquisition(self):
+        self.data = DataList(self.acq_num)
+        self.acq_thread = AcquisitionThread(self)
         ret = self.sdk.StartAcquisition()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.acq_thread.start()
@@ -406,6 +397,13 @@ class EMCCDCamera:
             return self.data.get_elements()
         else:
             return None
+
+    def save_as_sif(self, filename):
+        ret = self.sdk.SaveAsSif(filename)
+        if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
+            self.logg.info('Data Saved as Sif')
+        else:
+            self.logg.error(atmcd_errors.Error_Codes(ret))
 
     # def prepare_data_acquisition(self, num):
     #     self.set_readout_mode(4)
@@ -456,7 +454,7 @@ class EMCCDCamera:
     #     ret, data_array = self.sdk.GetAcquiredData16(num * self.img_size)
     #     if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
     #         self.logg.info('Data Retrieved')
-    #         return data_array.reshape(num, self.pixels_x, self.pixels_y)
+    #         return data_array.reshape(num, self.pixels_y, self.pixels_x)
     #     else:
     #         self.logg.error(atmcd_errors.Error_Codes(ret))
 
