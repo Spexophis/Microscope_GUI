@@ -395,7 +395,7 @@ class MainController(QtCore.QObject):
                 self.m.cam_set[0].t_exposure = self.con_controller.get_emccd_expo()
             if self.cameras[key] == 1:
                 x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
-                self.m.cam_set[1].set_roi(bx, by, x, x + nx, y, y + ny)
+                self.m.cam_set[1].set_roi(bx, by, x, nx, y, ny)
             if self.cameras[key] == 2:
                 x, y, nx, ny, bx, by = self.con_controller.get_thorcam_roi()
                 self.m.cam_set[2].set_roi(x, y, x + nx - 1, y + ny - 1)

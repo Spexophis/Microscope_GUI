@@ -2274,9 +2274,7 @@ class HamamatsuCamera:
         else:
             self.logg.error("Failed to close DCAM API")
 
-    def set_roi(self, h_bin, v_bin, h_start, h_end, v_start, v_end):
-        h_size = h_end - h_start
-        v_size = v_end - v_start
+    def set_roi(self, h_bin, v_bin, h_start, h_size, v_start, v_size):
         re = self.dcam.prop_setgetvalue(self.properties['SUBARRAY HPOS'], h_start)
         if re is not False:
             self.start_h = re
