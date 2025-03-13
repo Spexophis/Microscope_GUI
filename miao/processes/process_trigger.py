@@ -7,16 +7,16 @@ class TriggerSequence:
             # daq
             self.sample_rate = sample_rate  # Hz
             # digital triggers
-            self.digital_starts = [0.002, 0.007, 0.007, 0.012, 0.012, 0.012, 0.012]
-            self.digital_ends = [0.004, 0.010, 0.010, 0.015, 0.015, 0.015, 0.015]
+            self.digital_starts = [0.0000, 0.00012, 0.00012, 0.00064, 0.00064, 0.00064, 0.00064]
+            self.digital_ends = [0.0001, 0.00062, 0.00062, 0.00074, 0.00074, 0.00074, 0.00074]
             self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
             self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
             # piezo scanner
             self.piezo_conv_factors = [10., 10., 10.]
-            self.piezo_steps = [0.03, 0.03, 0.15]
-            self.piezo_ranges = [0.54, 0.54, 0.0]
-            self.piezo_positions = [50., 50., 50.]
-            self.piezo_return_time = 0.1
+            self.piezo_steps = [0.032, 0.032, 0.16]
+            self.piezo_ranges = [0.16, 0.16, 0.0]
+            self.piezo_positions = [20., 20., 20.]
+            self.piezo_return_time = 0.08
             self.return_samples = int(np.ceil(self.piezo_return_time * self.sample_rate))
             self.piezo_steps = [step_size / conv_factor for step_size, conv_factor in
                                 zip(self.piezo_steps, self.piezo_conv_factors)]
@@ -86,12 +86,12 @@ class TriggerSequence:
             self.samples_delay_act = int(np.abs(self.dot_starts_act[0] - self.galvo_starts_act[0]) / self.up_rate_act)
             self.samples_offset_act = self.ramp_up_samples_act - self.samples_delay_act - self.dot_step_s_act * self.dot_pos_act.size
             # emccd camera
-            self.cycle_time = 0.0521  # s
-            self.initial_time = 0.0055  # s
+            self.cycle_time = 0.0021  # s
+            self.initial_time = 0.00159  # s
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
-            self.standby_time = 0.0467  # s
+            self.standby_time = 0.00171  # s
             self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-            self.exposure_samples = 0.001  # s
+            self.exposure_samples = 0.0001  # s
             self.exposure_time = self.exposure_samples / self.sample_rate
             self.trigger_pulse_width = 50e-6  # s
             self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
@@ -345,8 +345,8 @@ class TriggerSequence:
         switch_galvo = np.ones(cycle_samples) * cam_sw
         switch_galvo[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
         switch_galvo[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
-        digital_sequences = np.tile(digital_sequences, 40)
-        switch_galvo = np.tile(switch_galvo, 40)
+        digital_sequences = np.tile(digital_sequences, 32)
+        switch_galvo = np.tile(switch_galvo, 32)
         offset_samples = np.zeros((len(digital_channels), int((0.025 + offset) / (0.2 / samples_x))))
         digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
         offset_samples = self.galvo_sw_states[2] * np.ones(int((0.025 + offset) / (0.2 / samples_x)))
@@ -361,7 +361,7 @@ class TriggerSequence:
         digital_sequences = np.concatenate((offset_samples, digital_sequences), axis=1)
         offset_samples = self.galvo_sw_states[2] * np.ones(samples_x + 2000)
         switch_galvo = np.concatenate((offset_samples, switch_galvo))
-        return np.vstack((fast_x, slow_y)), switch_galvo, digital_sequences, digital_channels, [0, 1], [2], 32 * 40
+        return np.vstack((fast_x, slow_y)), switch_galvo, digital_sequences, digital_channels, [0, 1], [2], 32 * 32
 
     def generate_piezo_scan_ramp_1um(self):
         lt = 0.25

@@ -1,4 +1,4 @@
-import sys
+import os, sys
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -79,7 +79,7 @@ class MainWidget(QtWidgets.QMainWindow):
         if file_dialog.exec_() == QtWidgets.QFileDialog.Accepted:
             selected_file = file_dialog.selectedFiles()
             if selected_file:
-                return selected_file[0]
+                return os.path.basename(selected_file[0])
             else:
                 return None
 

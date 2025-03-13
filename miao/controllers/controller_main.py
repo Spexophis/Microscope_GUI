@@ -6,6 +6,7 @@ import uuid
 import numpy as np
 import pandas as pd
 import tifffile as tf
+import h5py
 from PyQt5 import QtCore
 
 from miao.controllers import controller_ao, controller_con, controller_view
@@ -14,7 +15,7 @@ from miao.tools import tool_zernike as tz
 
 
 class MainController(QtCore.QObject):
-    sada = QtCore.pyqtSignal(str, np.ndarray, list)
+    sada = QtCore.pyqtSignal(str, np.ndarray, list, list)
     sazf = QtCore.pyqtSignal(list, np.ndarray)
     sig_plt = QtCore.pyqtSignal(list, list)
 
@@ -655,16 +656,24 @@ class MainController(QtCore.QObject):
         else:
             self.logg.error(f"Invalid video mode")
 
-    @QtCore.pyqtSlot(str, np.ndarray, list)
-    def save_data(self, tm: str, d: np.ndarray, idx: list):
+    @QtCore.pyqtSlot(str, np.ndarray, list, list)
+    def save_data(self, tm: str, d: np.ndarray, idx: list, pos: list):
         fn = self.v.get_file_dialog()
         if fn is not None:
-            fd = fn + '_' + tm + '.tiff'
+            fd = os.path.join(self.data_folder, tm + '_' + fn + '.h5')
         else:
-            fd = os.path.join(self.data_folder, tm + '.tiff')
-        tf.imwrite(fd, d, imagej=True, resolution=(
-            1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                   metadata={'unit': 'um', 'indices': idx})
+            fd = os.path.join(self.data_folder, tm + '.h5')
+        with h5py.File(fd, "w") as hdf5_file:
+            hdf5_file.create_dataset("image_stack", data=d, compression="gzip")
+            metadata_group = hdf5_file.create_group("metadata")
+            metadata_group.attrs["pixel_size"] = (self.pixel_sizes[self.cameras["imaging"]],
+                                                  self.pixel_sizes[self.cameras["imaging"]])
+            if idx is not None:
+                metadata_group.create_dataset("acquisition_sequence", data=np.array(idx))
+            if pos is not None:
+                scan_group = hdf5_file.create_group("scan_positions")
+                for i, arr in enumerate(pos):
+                    scan_group.create_dataset(f"axis_{i}", data=arr, compression="gzip")
 
     def prepare_focus_finding(self):
         self.lasers = self.con_controller.get_lasers()
@@ -820,9 +829,10 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             self.m.daq.run_triggers()
             time.sleep(0.2)
-            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack_',
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack',
                            self.m.cam_set[self.cameras["imaging"]].get_data(),
-                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
+                           self.p.trigger.piezo_scan_positions)
         except Exception as e:
             self.finish_widefield_zstack()
             self.logg.error(f"Error running widefield zstack: {e}")
@@ -842,6 +852,107 @@ class MainController(QtCore.QObject):
     def run_widefield_zstack(self, n: int):
         self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
+
+    def prepare_monalisa_scan(self):
+        self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.update_trigger_parameters("imaging")
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+                                  galvo_sequences=sw, galvo_channels=[2],
+                                  digital_sequences=dtr, digital_channels=dch)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
+
+    def monalisa_scan_2d(self):
+        try:
+            self.prepare_monalisa_scan()
+        except Exception as e:
+            self.logg.error(f"Error preparing monalisa scanning: {e}")
+            return
+        try:
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            time.sleep(0.02)
+            self.m.daq.run_triggers()
+            time.sleep(1.)
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_monalisa_scanning',
+                           self.m.cam_set[self.cameras["imaging"]].get_data(),
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
+                           self.p.trigger.piezo_scan_positions)
+        except Exception as e:
+            self.finish_monalisa_scan()
+            self.logg.error(f"Error running monalisa scanning: {e}")
+            return
+        self.finish_monalisa_scan()
+
+    def finish_monalisa_scan(self):
+        try:
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.m.daq.stop_triggers()
+            self.lasers_off()
+            self.logg.info("Monalisa scanning image acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping monalisa scanning: {e}")
+
+    def run_monalisa_scan(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.monalisa_scan_2d, iteration=n)
+
+    def prepare_point_scan(self):
+        self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.update_trigger_parameters("imaging")
+        ptr, sw, dtr, dch, pch, gch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers,
+                                                                                       self.cameras["imaging"])
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+                                  galvo_sequences=sw, galvo_channels=gch,
+                                  digital_sequences=dtr, digital_channels=dch)
+        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
+                                                   clean=self.p.trigger.initial_time,
+                                                   standby=self.p.trigger.standby_time)
+
+    def point_scan(self):
+        try:
+            self.prepare_point_scan()
+        except Exception as e:
+            self.logg.error(f"Error preparing point scanning: {e}")
+            return
+        try:
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            time.sleep(0.02)
+            self.m.daq.run_triggers()
+            time.sleep(1.)
+            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_piezo_scanning.tif')
+            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
+                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
+                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
+        except Exception as e:
+            self.finish_monalisa_scan()
+            self.logg.error(f"Error running point scanning: {e}")
+            return
+        self.finish_monalisa_scan()
+
+    def finish_point_scan(self):
+        try:
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.m.daq.stop_triggers()
+            self.lasers_off()
+            self.logg.info("Point scanning image acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping point scanning: {e}")
+
+    def run_point_scan(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.point_scan, iteration=n)
 
     def prepare_dot_scan(self):
         self.lasers = self.con_controller.get_lasers()
@@ -895,106 +1006,6 @@ class MainController(QtCore.QObject):
     def run_dot_scan(self, n: int):
         self.v.get_dialog()
         self.run_task(task=self.dot_scan, iteration=n)
-
-    def prepare_point_scan(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        ptr, sw, dtr, dch, pch, gch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers, self.cameras["imaging"])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  galvo_sequences=sw, galvo_channels=gch,
-                                  digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
-
-    def point_scan(self):
-        try:
-            self.prepare_point_scan()
-        except Exception as e:
-            self.logg.error(f"Error preparing point scanning: {e}")
-            return
-        try:
-            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-            time.sleep(0.02)
-            self.m.daq.run_triggers()
-            time.sleep(1.)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_monalisa_scanning.tif')
-            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
-        except Exception as e:
-            self.finish_monalisa_scan()
-            self.logg.error(f"Error running point scanning: {e}")
-            return
-        self.finish_monalisa_scan()
-
-    def finish_point_scan(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
-            self.m.daq.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Point scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping point scanning: {e}")
-
-    def run_point_scan(self, n: int):
-        self.v.get_dialog()
-        self.run_task(task=self.point_scan, iteration=n)
-
-    def prepare_monalisa_scan(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  galvo_sequences=sw, galvo_channels=[2],
-                                  digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
-
-    def monalisa_scan_2d(self):
-        try:
-            self.prepare_monalisa_scan()
-        except Exception as e:
-            self.logg.error(f"Error preparing monalisa scanning: {e}")
-            return
-        try:
-            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-            time.sleep(0.02)
-            self.m.daq.run_triggers()
-            time.sleep(1.)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_monalisa_scanning.tif')
-            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
-        except Exception as e:
-            self.finish_monalisa_scan()
-            self.logg.error(f"Error running monalisa scanning: {e}")
-            return
-        self.finish_monalisa_scan()
-
-    def finish_monalisa_scan(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
-            self.m.daq.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Monalisa scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping monalisa scanning: {e}")
-
-    def run_monalisa_scan(self, n: int):
-        self.v.get_dialog()
-        self.run_task(task=self.monalisa_scan_2d, iteration=n)
 
     def pattern_alignment(self):
         ax = self.con_controller.get_profile_axis()

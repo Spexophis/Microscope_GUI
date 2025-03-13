@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tifffile as tf
+import h5py
 from scipy.ndimage import maximum_filter, minimum_filter, label, find_objects
 
 
@@ -68,6 +69,33 @@ class BeadScanReconstruction:
                 signal = temp[indy[0] - 1:indy[0] + 2, indx[0] - 1:indx[0] + 2].sum()
                 result[j, i] = signal
         return result
+
+    def reconstruct(self, fd):
+        with h5py.File(fd, "r") as hdf5_file:
+            image_stack = hdf5_file["Image"][:]
+            scan_positions_loaded = [
+                hdf5_file["scan_positions/axis_0"][:],
+                hdf5_file["scan_positions/axis_1"][:],
+                hdf5_file["scan_positions/axis_2"][:]  # This will be an empty array
+            ]
+            pixel_size = hdf5_file["metadata/pixel_size"][:]
+        img_avg = np.average(image_stack, axis=0)
+        recon = np.zeros((20, 20))
+        max_index = np.unravel_index(np.argmax(img_avg), img_avg.shape)
+        mask = np.zeros(img_avg.shape)
+        mask[max_index[0] - 2:max_index[0] + 2, max_index[1] - 2:max_index[1] + 2] = 1
+        im, jm = 0, 0
+        summ = 0
+        for i in range(20):
+            for j in range(20):
+                idx = i * 20 + j
+                temp = (image_stack[idx] * mask).sum()
+                recon[i, j] = temp
+                if summ < temp:
+                    summ = temp
+                    im, jm = i, j
+        loc = [scan_positions_loaded[0][im], scan_positions_loaded[1][jm]]
+        return recon, loc
 
 
 if __name__ == '__main__':
