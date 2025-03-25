@@ -18,7 +18,7 @@ class CoboltLaser:
                 lasers[laser] = pycobolt.Cobolt06MLD(serialnumber=com_port)
                 self.logg.info("{} Laser Connected".format(laser))
             except Exception as e:
-                self.logg.error(f"405 nm Laser Error: {e}")
+                self.logg.error(f"Laser Error: {e}")
         _h = {key: True for key in lasers.keys()}
         return lasers, _h
 

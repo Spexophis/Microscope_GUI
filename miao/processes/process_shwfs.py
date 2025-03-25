@@ -134,6 +134,24 @@ class WavefrontSensing:
                     grady[iy, ix] = (py - sy) * self.calfactor
         return gradx, grady
 
+    def save_wfs_results(self, file_name, dm):
+        try:
+            tf.imwrite(file_name + f'_{dm.dm_serial}_wfs_base_raw.tif', self.ref)
+        except Exception as e:
+            self.logg.error(f"Error saving wfs base: {e}")
+        try:
+            tf.imwrite(file_name + f'_{dm.dm_serial}_wfs_offset_raw.tif', self.meas)
+        except Exception as e:
+            self.logg.error(f"Error saving wfs offset: {e}")
+        try:
+            tf.imwrite(file_name + f'_{dm.dm_serial}_wfs_processed.tif', self.im)
+        except Exception as e:
+            self.logg.error(f"Error saving wfs processed images: {e}")
+        try:
+            tf.imwrite(file_name + f'_{dm.dm_serial}_recon_wf.tif', self.wf)
+        except Exception as e:
+            self.logg.error(f"Error saving wfs wavefront: {e}")
+
     @staticmethod
     def _hudgins_extend_mask(gradx, grady):
         """ extension technique Poyneer 2002 """

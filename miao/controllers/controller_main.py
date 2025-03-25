@@ -1403,25 +1403,10 @@ class MainController(QtCore.QObject):
     def save_img_wf(self):
         fn = self.v.get_file_dialog()
         if fn is not None:
-            file_name = fn + '_' + time.strftime("%Y%m%d%H%M%S")
+            file_name = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + "_" + fn)
         else:
             file_name = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S"))
-        try:
-            tf.imwrite(file_name + '_shimg_base_raw.tif', self.p.shwfsr.ref)
-        except Exception as e:
-            self.logg.error(f"Error saving shwfs _base: {e}")
-        try:
-            tf.imwrite(file_name + '_shimg_offset_raw.tif', self.p.shwfsr.meas)
-        except Exception as e:
-            self.logg.error(f"Error saving shwfs offset: {e}")
-        try:
-            tf.imwrite(file_name + '_shimg_processed.tif', self.p.shwfsr.im)
-        except Exception as e:
-            self.logg.error(f"Error saving shwfs imgstack: {e}")
-        try:
-            tf.imwrite(file_name + '_reconstructed_wf.tif', self.p.shwfsr.wf)
-        except Exception as e:
-            self.logg.error(f"Error saving shwfs wavefront: {e}")
+        self.p.shwfsr.save_wfs_results(file_name, self.dfm)
 
     def prepare_influence_function(self):
         self.lasers = self.con_controller.get_lasers()
