@@ -76,7 +76,7 @@ class BeadScanReconstruction:
             scan_positions_loaded = [
                 hdf5_file["scan_positions/axis_0"][:],
                 hdf5_file["scan_positions/axis_1"][:],
-                hdf5_file["scan_positions/axis_2"][:]  # This will be an empty array
+                hdf5_file["scan_positions/axis_2"][:]
             ]
             pixel_size = hdf5_file["metadata/pixel_size"][:]
         img_avg = np.average(image_stack, axis=0)

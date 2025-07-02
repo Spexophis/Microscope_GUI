@@ -134,7 +134,7 @@ class NIDAQ:
         try:
             with nidaqmx.Task() as task:
                 for ind in indices:
-                    task.ao_channels.add_ao_voltage_chan(self.galvo_channels[ind], min_val=-5., max_val=5.)
+                    task.ao_channels.add_ao_voltage_chan(self.galvo_channels[ind], min_val=-10., max_val=10.)
                 task.write(pos)
                 task.wait_until_done(WAIT_INFINITELY)
                 task.stop()
@@ -289,7 +289,7 @@ class NIDAQ:
         try:
             self.tasks["galvo"] = nidaqmx.Task("galvo")
             for ind in indices:
-                self.tasks["galvo"].ao_channels.add_ao_voltage_chan(self.galvo_channels[ind], min_val=-5., max_val=5.)
+                self.tasks["galvo"].ao_channels.add_ao_voltage_chan(self.galvo_channels[ind], min_val=-10., max_val=10.)
             self.tasks["galvo"].timing.cfg_samp_clk_timing(rate=self.sample_rate, source=self.clock[0],
                                                            active_edge=Edge.RISING, sample_mode=self.mode,
                                                            samps_per_chan=n_samples)

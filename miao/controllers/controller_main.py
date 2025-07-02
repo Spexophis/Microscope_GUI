@@ -6,7 +6,6 @@ import uuid
 import numpy as np
 import pandas as pd
 import tifffile as tf
-import h5py
 from PyQt5 import QtCore
 
 from miao.controllers import controller_ao, controller_con, controller_view
@@ -660,20 +659,19 @@ class MainController(QtCore.QObject):
     def save_data(self, tm: str, d: np.ndarray, idx: list, pos: list):
         fn = self.v.get_file_dialog()
         if fn is not None:
-            fd = os.path.join(self.data_folder, tm + '_' + fn + '.h5')
+            fd = os.path.join(self.data_folder, tm + '_' + fn)
         else:
-            fd = os.path.join(self.data_folder, tm + '.h5')
-        with h5py.File(fd, "w") as hdf5_file:
-            hdf5_file.create_dataset("image_stack", data=d, compression="gzip")
-            metadata_group = hdf5_file.create_group("metadata")
-            metadata_group.attrs["pixel_size"] = (self.pixel_sizes[self.cameras["imaging"]],
-                                                  self.pixel_sizes[self.cameras["imaging"]])
+            fd = os.path.join(self.data_folder, tm)
+        pixel_size = self.pixel_sizes[self.cameras["imaging"]]
+        tf.imwrite(str(fd + r".tif"), data=d, metadata={"pixel_size": (pixel_size, pixel_size)})
+        with pd.ExcelWriter(str(fd + r"_metadata.xlsx"), engine="openpyxl") as writer:
             if idx is not None:
-                metadata_group.create_dataset("acquisition_sequence", data=np.array(idx))
+                df_idx = pd.DataFrame(idx, columns=["acquisition_sequence"])
+                df_idx.to_excel(writer, sheet_name="acquisition_sequence", index=False)
             if pos is not None:
-                scan_group = hdf5_file.create_group("scan_positions")
                 for i, arr in enumerate(pos):
-                    scan_group.create_dataset(f"axis_{i}", data=arr, compression="gzip")
+                    df_pos = pd.DataFrame(arr, columns=[f"axis_{i}"])
+                    df_pos.to_excel(writer, sheet_name=f"axis_{i}", index=False)
 
     def prepare_focus_finding(self):
         self.lasers = self.con_controller.get_lasers()
@@ -811,7 +809,7 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters("imaging")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
         dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
-        self.set_piezo_position_z(self.p.trigger.piezo_scan_positions[2][0])
+        self.m.daq.set_piezo_position(pos=[ptr[0]], indices=[2])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
@@ -823,7 +821,7 @@ class MainController(QtCore.QObject):
         try:
             self.prepare_widefield_zstack()
         except Exception as e:
-            self.logg.error(f"Error starting widefield zstack: {e}")
+            self.logg.error(f"Error preparing widefield zstack: {e}")
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
@@ -853,7 +851,7 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
 
-    def prepare_monalisa_scan(self):
+    def prepare_monalisa_scan_2d(self):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
@@ -861,9 +859,9 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        self.m.daq.set_piezo_position(pos=list(np.swapaxes(ptr, 0, 1)[0]), indices=pch)
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  galvo_sequences=sw, galvo_channels=[2],
                                   digital_sequences=dtr, digital_channels=dch)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
                                                    clean=self.p.trigger.initial_time,
@@ -871,7 +869,7 @@ class MainController(QtCore.QObject):
 
     def monalisa_scan_2d(self):
         try:
-            self.prepare_monalisa_scan()
+            self.prepare_monalisa_scan_2d()
         except Exception as e:
             self.logg.error(f"Error preparing monalisa scanning: {e}")
             return
@@ -895,6 +893,7 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
+            self.reset_piezo_positions()
             self.logg.info("Monalisa scanning image acquired")
         except Exception as e:
             self.logg.error(f"Error stopping monalisa scanning: {e}")
@@ -914,7 +913,6 @@ class MainController(QtCore.QObject):
                                                                                        self.cameras["imaging"])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  galvo_sequences=sw, galvo_channels=gch,
                                   digital_sequences=dtr, digital_channels=dch)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
                                                    clean=self.p.trigger.initial_time,
@@ -946,6 +944,7 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
+            self.reset_piezo_positions()
             self.logg.info("Point scanning image acquired")
         except Exception as e:
             self.logg.error(f"Error stopping point scanning: {e}")
@@ -999,6 +998,7 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
+            self.reset_piezo_positions()
             self.logg.info("Dot scanning image acquired")
         except Exception as e:
             self.logg.error(f"Error stopping dot scanning: {e}")

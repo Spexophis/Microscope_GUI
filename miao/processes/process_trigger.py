@@ -13,8 +13,8 @@ class TriggerSequence:
             self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
             # piezo scanner
             self.piezo_conv_factors = [10., 10., 10.]
-            self.piezo_steps = [0.032, 0.032, 0.16]
-            self.piezo_ranges = [0.16, 0.16, 0.0]
+            self.piezo_steps = [0.04, 0.04, 0.16]
+            self.piezo_ranges = [0.2, 0.2, 0.0]
             self.piezo_positions = [20., 20., 20.]
             self.piezo_return_time = 0.08
             self.return_samples = int(np.ceil(self.piezo_return_time * self.sample_rate))
@@ -252,6 +252,30 @@ class TriggerSequence:
     def generate_digital_triggers(self, lasers, camera):
         cam_ind = camera + 4
         digital_channels = lasers.copy()
+        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
+        if interval_samples > self.digital_starts[cam_ind]:
+            offset_samples = interval_samples - self.digital_starts[cam_ind]
+            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
+            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
+        digital_channels.append(cam_ind)
+        cycle_samples = max(self.digital_ends[cam_ind] + self.standby_samples + 2,
+                            max([self.digital_ends[i] for i in digital_channels]))
+        digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
+        self.exposure_time = self.exposure_samples / self.sample_rate
+        for ln, ch in enumerate(digital_channels):
+            digital_trigger[ln, self.digital_starts[ch]:self.digital_ends[ch]] = 1
+        switch_trigger = self.galvo_sw_states[camera] * np.ones(cycle_samples, dtype=np.float16)
+        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
+        switch_trigger[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
+        return digital_trigger, switch_trigger, digital_channels
+
+    def generate_slm_trigger(self, seq="5ms_dark_pair"):
+
+
+    def generate_digital_triggers_slm(self, lasers, camera, slm_seq=""):
+        cam_ind = camera + 4
+        digital_channels = 1
         interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
         if interval_samples > self.digital_starts[cam_ind]:
             offset_samples = interval_samples - self.digital_starts[cam_ind]
