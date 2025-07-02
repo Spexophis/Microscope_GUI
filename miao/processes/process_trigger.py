@@ -270,10 +270,7 @@ class TriggerSequence:
         switch_trigger[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
         return digital_trigger, switch_trigger, digital_channels
 
-    def generate_slm_trigger(self, seq="5ms_dark_pair"):
-
-
-    def generate_digital_triggers_slm(self, lasers, camera, slm_seq=""):
+    def generate_digital_triggers_slm(self, lasers, camera, slm_seq="5ms_dark_pair"):
         cam_ind = camera + 4
         digital_channels = 1
         interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
