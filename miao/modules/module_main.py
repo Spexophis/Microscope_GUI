@@ -3,7 +3,7 @@ from miao.modules import module_deformablemirror
 from miao.modules import module_hamamatsuorchflash
 from miao.modules import module_thorlabcam
 from miao.modules import module_slm_qxga
-from miao.modules import module_slm_lcos
+# from miao.modules import module_slm_lcos
 from miao.modules import module_coboltlaser
 from miao.modules import module_mcldeck
 from miao.modules import module_mclpiezo
@@ -45,11 +45,11 @@ class MainModule:
                                                                         config=self.config, path=self.data_folder)
             except Exception as e:
                 self.logg.error_log.error(f"{e}")
-        # self.slm = {}
-        # try:
-        #     self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
-        # except Exception as e:
-        #     self.logg.error_log.error(f"{e}")
+        self.slm = {}
+        try:
+            self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
         # try:
         #     self.slm["Phase"] = module_slm_lcos.LCOS(logg=self.logg.error_log, config=self.config)
         # except Exception as e:
@@ -95,6 +95,11 @@ class MainModule:
             self.logg.error_log.error(f"{e}")
         try:
             for key in self.dm.keys():
+                self.dm[key].close()
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
+        try:
+            for key in self.slm.keys():
                 self.dm[key].close()
         except Exception as e:
             self.logg.error_log.error(f"{e}")

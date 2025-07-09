@@ -19,6 +19,8 @@ class QXGA:
         self.logg = logg or self.setup_logging()
         self.config = config or self.load_configs()
         self.r11 = self._initiate()
+        self.get_temperature()
+        self.ord_dict = self.get_order_list()
 
     @staticmethod
     def setup_logging():
@@ -36,9 +38,9 @@ class QXGA:
     def _initiate(self):
         r11_lib = self.config.configs["Spatial Light Modulator"]["Forth Dimension Displays"]["ControlLibrary"]
         r11 = ct.windll.LoadLibrary(r11_lib)
-        ver = ct.create_string_buffer(8)
-        maxlen = ct.c_uint8(10)
-        res = r11.R11_LibGetVersion(ver, maxlen)
+        ver = ct.create_string_buffer(16)
+        max_len = ct.c_uint8(16)
+        res = r11.R11_LibGetVersion(ver, max_len)
         if res == 0:
             self.logg.info(r"QXGA R11 Software version: %s" % ver.value)
             guid = ct.c_char_p(b"54ED7AC9-CC23-4165-BE32-79016BAFB950")
@@ -52,16 +54,13 @@ class QXGA:
                 res = r11.FDD_DevOpenWinUSB(po, RS485_DEV_TIMEOUT)
                 if res == 0:
                     self.logg.info('Open Dev port successfully')
-                    disp_temp = ct.c_uint16(0)
-                    r11.R11_RpcSysGetDisplayTemp(ct.byref(disp_temp))
-                    self.logg.info('Display temperature: %s' % disp_temp.value)
                     return r11
                 else:
-                    raise ValueError("Fail to open the port")
+                    raise RuntimeError("Fail to open the port")
             else:
-                raise ValueError("Fail to find the port")
+                raise RuntimeError("Fail to find the port")
         else:
-            raise ValueError("Fail to open the port")
+            raise RuntimeError("Fail to open the port")
 
     def close(self):
         re = self.r11.FDD_DevClose()
@@ -79,6 +78,14 @@ class QXGA:
         else:
             self.logg.error('fail to load the repz11 file')
 
+    def get_temperature(self):
+        disp_temp = ct.c_uint16(0)
+        res = self.r11.R11_RpcSysGetDisplayTemp(ct.byref(disp_temp))
+        if res == 0:
+            self.logg.info('Display temperature: %s' % disp_temp.value)
+        else:
+            raise RuntimeError('Fail to get the display temperature')
+
     def get_order_num(self):
         ord_count = ct.c_uint16(0)
         res = self.r11.R11_RpcRoGetCount(ct.byref(ord_count))
@@ -86,6 +93,24 @@ class QXGA:
             return ord_count.value
         else:
             raise RuntimeError('Fail to get the order number')
+
+    def get_order_name(self, n):
+        ord_count = ct.c_uint16(n)
+        ord_name = ct.create_string_buffer(128)
+        max_len = ct.c_uint8(128)
+        res = self.r11.R11_RpcRoGetName(ord_count, ord_name, max_len)
+        if res == 0:
+            return ord_name.value
+        else:
+            raise RuntimeError('Fail to get the order name')
+
+    def get_order_list(self):
+        ord_dict = {}
+        odn = self.get_order_num()
+        for i in range(odn):
+            ord_name = self.get_order_name(i)
+            ord_dict[i] = ord_name.decode('utf-8')
+        return ord_dict
 
     def select_order(self, n):
         ord_index = ct.c_uint16(n)

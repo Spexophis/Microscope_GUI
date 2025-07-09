@@ -249,47 +249,104 @@ class TriggerSequence:
         if self.cycle_time is not None:
             self.cycle_time = cycle_time
 
-    def generate_digital_triggers(self, lasers, camera):
+    def generate_digital_triggers(self, lasers, camera, slm_seq=None):
         cam_ind = camera + 4
         digital_channels = lasers.copy()
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        if interval_samples > self.digital_starts[cam_ind]:
-            offset_samples = interval_samples - self.digital_starts[cam_ind]
-            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
-            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
         digital_channels.append(cam_ind)
-        cycle_samples = max(self.digital_ends[cam_ind] + self.standby_samples + 2,
-                            max([self.digital_ends[i] for i in digital_channels]))
-        digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        for ln, ch in enumerate(digital_channels):
-            digital_trigger[ln, self.digital_starts[ch]:self.digital_ends[ch]] = 1
-        switch_trigger = self.galvo_sw_states[camera] * np.ones(cycle_samples, dtype=np.float16)
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
-        switch_trigger[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
+        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
+        if slm_seq is None:
+            if interval_samples > self.digital_starts[cam_ind]:
+                offset_samples = interval_samples - self.digital_starts[cam_ind]
+                self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
+                self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
+            cycle_samples = max(self.digital_ends[cam_ind] + self.standby_samples + 2,
+                                max([self.digital_ends[i] for i in digital_channels]))
+            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+            self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
+            self.exposure_time = self.exposure_samples / self.sample_rate
+            for ln, ch in enumerate(digital_channels):
+                digital_trigger[ln, self.digital_starts[ch]:self.digital_ends[ch]] = 1
+            switch_trigger = self.galvo_sw_states[camera] * np.ones(cycle_samples, dtype=np.float16)
+            switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
+            switch_trigger[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
+        else:
+            act_seq, cam_seq, self.exposure_time, self.exposure_samples = self.generate_slm_triggers(slm_seq)
+            dark_samples = int(act_seq.shape[0] / 2)
+            offset_samples = max(self.standby_samples - dark_samples, 0)
+            if len(digital_channels) == 2:
+                cycle_samples = interval_samples + act_seq.shape[0] + offset_samples
+                digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+                digital_trigger[0][interval_samples:interval_samples + act_seq.shape[0]] = act_seq
+                digital_trigger[1][interval_samples:interval_samples + cam_seq.shape[0]] = cam_seq
+                switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+                switch_trigger[interval_samples:interval_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+            elif len(digital_channels) == 3:
+                expo_samples = self.digital_ends[lasers[0]] - self.digital_starts[lasers[0]]
+                interp_samples = max(interval_samples, expo_samples)
+                cycle_samples = interp_samples + act_seq.shape[0] + offset_samples
+                digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+                digital_trigger[0][:expo_samples] = 1
+                digital_trigger[1][interp_samples:interp_samples + act_seq.shape[0]] = act_seq
+                digital_trigger[2][interp_samples:interp_samples + cam_seq.shape[0]] = cam_seq
+                switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+                switch_trigger[interp_samples:interp_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+            else:
+                self.logg.error("Digital channels error.")
+                raise ValueError("Digital channels number is wrong.")
         return digital_trigger, switch_trigger, digital_channels
 
-    def generate_digital_triggers_slm(self, lasers, camera, slm_seq="5ms_dark_pair"):
-        cam_ind = camera + 4
-        digital_channels = 1
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        if interval_samples > self.digital_starts[cam_ind]:
-            offset_samples = interval_samples - self.digital_starts[cam_ind]
-            self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
-            self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        digital_channels.append(cam_ind)
-        cycle_samples = max(self.digital_ends[cam_ind] + self.standby_samples + 2,
-                            max([self.digital_ends[i] for i in digital_channels]))
-        digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
-        self.exposure_samples = self.digital_ends[cam_ind] - self.digital_starts[cam_ind]
-        self.exposure_time = self.exposure_samples / self.sample_rate
-        for ln, ch in enumerate(digital_channels):
-            digital_trigger[ln, self.digital_starts[ch]:self.digital_ends[ch]] = 1
-        switch_trigger = self.galvo_sw_states[camera] * np.ones(cycle_samples, dtype=np.float16)
-        switch_trigger[:self.digital_starts[cam_ind] - self.galvo_sw_settle_samples] = self.galvo_sw_states[2]
-        switch_trigger[self.digital_ends[cam_ind] + 1:] = self.galvo_sw_states[2]
-        return digital_trigger, switch_trigger, digital_channels
+    def generate_slm_triggers(self, slm_seq="5ms_dark_pair"):
+        if slm_seq == "400us_lit_balanced":
+            samps_total = round(776.64e-6 * self.sample_rate)
+            expo_on = 400e-6
+            samps_on = round(expo_on * self.sample_rate)
+            samps_start = int(270.187e-6 * self.sample_rate)
+            samps_end = round(720.96e-6 * self.sample_rate)
+            act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            act_seq[:samps_total] = 1
+            cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            cam_seq[samps_start:samps_end] = 1
+        elif slm_seq == "600us_lit_balanced":
+            samps_total = round(976.747e-6 * self.sample_rate)
+            expo_on = 600.107e-6
+            samps_on = round(expo_on * self.sample_rate)
+            samps_start = int(270.187e-6 * self.sample_rate)
+            samps_end = round(921.067e-6 * self.sample_rate)
+            act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            act_seq[:samps_total] = 1
+            cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            cam_seq[samps_start:samps_end] = 1
+        elif slm_seq == "5ms_dark_pair":
+            samps_total = round(5.31072e-3 * self.sample_rate)
+            expo_on = 5.0e-3
+            samps_on = round(expo_on * self.sample_rate)
+            samps_start = int(270.187e-6 * self.sample_rate)
+            samps_end = round(5.270187e-3 * self.sample_rate)
+            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            cam_seq[samps_start:samps_end] = 1
+        elif slm_seq == "10ms_dark_pair":
+            samps_total = round(10.31072e-3 * self.sample_rate)
+            expo_on = 10.0e-3
+            samps_on = round(expo_on * self.sample_rate)
+            samps_start = int(270.187e-6 * self.sample_rate)
+            samps_end = round(10.270187e-3 * self.sample_rate)
+            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            cam_seq[samps_start:samps_end] = 1
+        elif slm_seq == "20ms_dark_pair":
+            samps_total = round(20.31072e-3 * self.sample_rate)
+            expo_on = 20.0e-3
+            samps_on = round(expo_on * self.sample_rate)
+            samps_start = int(270.187e-6 * self.sample_rate)
+            samps_end = round(20.270187e-3 * self.sample_rate)
+            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            cam_seq[samps_start:samps_end] = 1
+        else:
+            self.logg.error("SLM sequence error.")
+            raise ValueError("SLM sequence is wrong.")
+        return act_seq, cam_seq, expo_on, samps_on
 
     def generate_digital_triggers_for_scan(self, lasers, camera):
         digital_triggers, switch_trigger, chs = self.generate_digital_triggers(lasers, camera)
