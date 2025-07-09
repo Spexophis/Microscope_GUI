@@ -2,14 +2,12 @@
 
 
 import platform
+import threading
+from collections import deque
 from ctypes import *
 from enum import IntEnum
 
 import numpy as np
-import sys
-import threading
-import time
-from collections import deque
 
 __date__ = '2021-06-30'
 __copyright__ = 'Copyright (C) 2021-2024 Hamamatsu Photonics K.K.'
@@ -2161,7 +2159,6 @@ class Dcam:
 
 
 class HamamatsuCamera:
-
     class CameraSettings:
         def __init__(self):
             self.t_clean = 0
@@ -2523,8 +2520,8 @@ class HamamatsuCamera:
             return self.data.get_elements()
         else:
             return None
-        
-        
+
+
 class AcquisitionThread(threading.Thread):
     running = False
     lock = threading.Lock()
@@ -2571,4 +2568,3 @@ class DataList:
     def emit_update(self):
         if self.callback is not None:
             self.callback(self)
-            
