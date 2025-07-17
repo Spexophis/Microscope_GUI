@@ -1280,19 +1280,11 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"DM Error: {e}")
 
-    def set_img_wfs(self, idx):
-        if idx == 1:
-            parameters = self.ao_controller.get_parameters_img()
-            self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
-            self.p.shwfsr.update_parameters(parameters)
-            self.logg.info('SHWFS parameter updated')
-        elif idx == 2:
-            parameters = self.ao_controller.get_parameters_foc()
-            self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
-            self.p.shwfsr.update_parameters(parameters)
-            self.logg.info('SHWFS parameter updated')
-        else:
-            raise ValueError("Invalid wfs index")
+    def set_img_wfs(self):
+        parameters = self.ao_controller.get_parameters_img()
+        self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
+        self.p.shwfsr.update_parameters(parameters)
+        self.logg.info('SHWFS parameter updated')
 
     def prepare_img_wfs(self):
         self.lasers = self.con_controller.get_lasers()
@@ -1300,7 +1292,7 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
-        self.set_img_wfs(self.cameras["wfs"])
+        self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
@@ -1411,7 +1403,7 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
-        self.set_img_wfs(self.cameras["wfs"])
+        self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         wfs = self.ao_controller.get_dm_selection()
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
@@ -1502,7 +1494,7 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
-        self.set_img_wfs(self.cameras["wfs"])
+        self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         self.dfm.ctrl.reset_control()
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
@@ -1927,7 +1919,7 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
-        self.set_img_wfs(self.cameras["wfs"])
+        self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
         dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])

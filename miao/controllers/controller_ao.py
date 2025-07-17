@@ -18,23 +18,10 @@ class AOController:
             self.v.QSpinBox_spacing_img.value(), self.v.QSpinBox_radius_img.value(), \
             self.v.QDoubleSpinBox_img_background.value()
 
-    def get_parameters_foc(self):
-        return self.v.QSpinBox_base_xcenter_foc.value(), self.v.QSpinBox_base_ycenter_foc.value(), \
-            self.v.QSpinBox_offset_xcenter_foc.value(), self.v.QSpinBox_offset_ycenter_foc.value(), \
-            self.v.QSpinBox_n_lenslets_x_foc.value(), self.v.QSpinBox_n_lenslets_y_foc.value(), \
-            self.v.QSpinBox_spacing_foc.value(), self.v.QSpinBox_radius_foc.value(), \
-            self.v.QDoubleSpinBox_foc_background.value()
-
     def get_gradient_method_img(self):
         return self.v.QComboBox_wfrmd_img.currentText()
 
-    def get_gradient_method_foc(self):
-        return self.v.QComboBox_wfrmd_foc.currentText()
-
     def get_img_wfs_method(self):
-        return self.v.QComboBox_wfsmd.currentText()
-
-    def get_foc_wfs_method(self):
         return self.v.QComboBox_wfsmd.currentText()
 
     def get_actuator(self):

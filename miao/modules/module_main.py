@@ -1,9 +1,7 @@
 from miao.modules import module_andorixon
 from miao.modules import module_deformablemirror
 from miao.modules import module_hamamatsuorchflash
-from miao.modules import module_thorlabcam
 from miao.modules import module_slm_qxga
-# from miao.modules import module_slm_lcos
 from miao.modules import module_coboltlaser
 from miao.modules import module_mcldeck
 from miao.modules import module_mclpiezo
@@ -28,14 +26,9 @@ class MainModule:
             self.cam_set[1] = self.scmoscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
-        # try:
-        #     self.thorcam = module_thorlabcam.ThorCMOS(logg=self.logg.error_log)
-        #     self.cam_set[2] = self.thorcam
-        # except Exception as e:
-        #     self.logg.error_log.error(f"{e}")
         try:
             self.tiscam = module_tis.TISCamera(logg=self.logg.error_log)
-            self.cam_set[3] = self.tiscam
+            self.cam_set[2] = self.tiscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.dm = {}
@@ -45,15 +38,10 @@ class MainModule:
                                                                         config=self.config, path=self.data_folder)
             except Exception as e:
                 self.logg.error_log.error(f"{e}")
-        self.slm = {}
         try:
-            self.slm["Binary"] = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
+            self.slm = module_slm_qxga.QXGA(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
-        # try:
-        #     self.slm["Phase"] = module_slm_lcos.LCOS(logg=self.logg.error_log, config=self.config)
-        # except Exception as e:
-        #     self.logg.error_log.error(f"{e}")
         try:
             self.laser = module_coboltlaser.CoboltLaser(logg=self.logg.error_log, config=self.config)
         except Exception as e:
@@ -88,8 +76,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            for key in self.slm.keys():
-                self.slm[key].close()
+            self.slm.close()
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
