@@ -152,11 +152,8 @@ class MainController(QtCore.QObject):
 
             self.laser_lists = ["405", "488_0", "488_1", "488_2"]
 
-            self.magnifications = [189, 1., 1., 1.]
-            self.pixel_sizes = []
-            self.pixel_sizes = [self.m.cam_set[i].ps / mag for i, mag in enumerate(self.magnifications)]
+            self.pixel_sizes = [0., 0., 0., 0.]
             self.pixel_sizes[0] = 0.068783
-            self.magnifications[0] = self.m.cam_set[0].ps / self.pixel_sizes[0]
 
             self.dm_cmd_ind = {}
             for key in self.m.dm.keys():

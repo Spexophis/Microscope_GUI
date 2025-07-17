@@ -28,11 +28,11 @@ class MainModule:
             self.cam_set[1] = self.scmoscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
-        try:
-            self.thorcam = module_thorlabcam.ThorCMOS(logg=self.logg.error_log)
-            self.cam_set[2] = self.thorcam
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
+        # try:
+        #     self.thorcam = module_thorlabcam.ThorCMOS(logg=self.logg.error_log)
+        #     self.cam_set[2] = self.thorcam
+        # except Exception as e:
+        #     self.logg.error_log.error(f"{e}")
         try:
             self.tiscam = module_tis.TISCamera(logg=self.logg.error_log)
             self.cam_set[3] = self.tiscam
@@ -74,19 +74,8 @@ class MainModule:
 
     def close(self):
         try:
-            self.ccdcam.close()
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
-        try:
-            self.scmoscam.close()
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
-        try:
-            self.thorcam.close()
-        except Exception as e:
-            self.logg.error_log.error(f"{e}")
-        try:
-            self.tiscam.close()
+            for key in self.cam_set.keys():
+                self.cam_set[key].close()
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
@@ -100,7 +89,7 @@ class MainModule:
             self.logg.error_log.error(f"{e}")
         try:
             for key in self.slm.keys():
-                self.dm[key].close()
+                self.slm[key].close()
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
