@@ -42,9 +42,6 @@ class AOController:
         if wst:
             self.v.QComboBox_cmd.setCurrentIndex(self.v.QComboBox_cmd.count() - 1)
 
-    def get_file_name(self):
-        return self.v.QLineEdit_filename.text()
-
     def get_ao_iteration(self):
         return self.v.QSpinBox_zernike_mode_start.value(), self.v.QSpinBox_zernike_mode_stop.value(), \
             self.v.QDoubleSpinBox_zernike_mode_amps_start.value(), self.v.QDoubleSpinBox_zernike_mode_amps_step.value(), \

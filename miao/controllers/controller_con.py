@@ -35,11 +35,6 @@ class ConController:
     def set_scmos_expo(self, t):
         self.v.QDoubleSpinBox_scmos_exposure_time.setValue(t)
 
-    def get_thorcam_roi(self):
-        return [self.v.QSpinBox_thorcam_coordinate_x.value(), self.v.QSpinBox_thorcam_coordinate_y.value(),
-                self.v.QSpinBox_thorcam_coordinate_nx.value(), self.v.QSpinBox_thorcam_coordinate_ny.value(),
-                self.v.QSpinBox_thorcam_coordinate_binx.value(), self.v.QSpinBox_thorcam_coordinate_biny.value()]
-
     def get_tis_expo(self):
         return self.v.QDoubleSpinBox_tis_exposure_time.value()
 
@@ -61,33 +56,21 @@ class ConController:
                 self.v.QDoubleSpinBox_pid_ki.value(),
                 self.v.QDoubleSpinBox_pid_kd.value())
 
-    def get_galvo_positions(self):
-        return [self.v.QDoubleSpinBox_galvo_x.value(), self.v.QDoubleSpinBox_galvo_y.value()]
-
     def get_lasers(self):
         lasers = []
         if self.v.QRadioButton_laser_405.isChecked():
             lasers.append(0)
-        if self.v.QRadioButton_laser_488_0.isChecked():
-            lasers.append(1)
-        if self.v.QRadioButton_laser_488_1.isChecked():
-            lasers.append(2)
         if self.v.QRadioButton_laser_488_2.isChecked():
-            lasers.append(3)
+            lasers.append(1)
         return lasers
 
     def get_cobolt_laser_power(self, laser):
         if laser == "405":
             return [self.v.QDoubleSpinBox_laserpower_405.value()]
-        if laser == "488_0":
-            return [self.v.QDoubleSpinBox_laserpower_488_0.value()]
-        if laser == "488_1":
-            return [self.v.QDoubleSpinBox_laserpower_488_1.value()]
         if laser == "488_2":
             return [self.v.QDoubleSpinBox_laserpower_488_2.value()]
         if laser == "all":
-            return [self.v.QDoubleSpinBox_laserpower_405.value(), self.v.QDoubleSpinBox_laserpower_488_0.value(),
-                    self.v.QDoubleSpinBox_laserpower_488_1.value(), self.v.QDoubleSpinBox_laserpower_488_2.value()]
+            return [self.v.QDoubleSpinBox_laserpower_405.value(), self.v.QDoubleSpinBox_laserpower_488_2.value()]
 
     def get_imaging_camera(self):
         detection_device = self.v.QComboBox_imaging_camera_selection.currentIndex()
@@ -120,34 +103,10 @@ class ConController:
     def get_piezo_return_time(self):
         return self.v.QDoubleSpinBox_piezo_return_time.value()
 
-    def get_galvo_scan_parameters(self):
-        galvo_positions = [self.v.QDoubleSpinBox_galvo_x.value(), self.v.QDoubleSpinBox_galvo_y.value()]
-        galvo_ranges = [[self.v.QDoubleSpinBox_galvo_range_x.value(), self.v.QDoubleSpinBox_galvo_range_y.value()],
-                        [self.v.QDoubleSpinBox_dot_range_x.value(), self.v.QDoubleSpinBox_dot_range_y.value()]]
-        dot_pos = [self.v.QSpinBox_dot_step_x.value(), self.v.QDoubleSpinBox_dot_step_x.value(),
-                   self.v.QDoubleSpinBox_dot_step_y.value()]
-        offsets = [self.v.QDoubleSpinBox_galvo_offset_x.value(), self.v.QDoubleSpinBox_galvo_offset_y.value()]
-        galvo_positions_act = [self.v.QDoubleSpinBox_galvo_x_act.value(), self.v.QDoubleSpinBox_galvo_y_act.value()]
-        galvo_ranges_act = [
-            [self.v.QDoubleSpinBox_galvo_range_x_act.value(), self.v.QDoubleSpinBox_galvo_range_y_act.value()],
-            [self.v.QDoubleSpinBox_dot_range_x_act.value(), self.v.QDoubleSpinBox_dot_range_y_act.value()]]
-        dot_pos_act = [self.v.QSpinBox_dot_step_x_act.value(), self.v.QDoubleSpinBox_dot_step_x_act.value(),
-                       self.v.QDoubleSpinBox_dot_step_y_act.value()]
-        offsets_act = [self.v.QDoubleSpinBox_galvo_offset_x_act.value(), self.v.QDoubleSpinBox_galvo_offset_y_act.value()]
+    def get_galvo_switch_parameters(self):
         sws = [self.v.QDoubleSpinBox_emccd_gvs.value(), self.v.QDoubleSpinBox_scmos_gvs.value(),
                self.v.QDoubleSpinBox_thorcam_gvs.value()]
-        return (galvo_positions, galvo_ranges, dot_pos, offsets,
-                galvo_positions_act, galvo_ranges_act, dot_pos_act, offsets_act, sws)
-
-    def change_galvo_scan(self, x=None, y=None):
-        if x is not None:
-            self.v.QDoubleSpinBox_galvo_x.setValue(x)
-        if y is not None:
-            self.v.QDoubleSpinBox_galvo_y.setValue(y)
-
-    def display_frequency(self, dsv, dsv_act):
-        self.v.QLCDNumber_galvo_frequency.display(dsv)
-        self.v.QLCDNumber_galvo_frequency_act.display(dsv_act)
+        return sws
 
     def get_profile_axis(self):
         return self.v.QComboBox_profile_axis.currentText()
@@ -169,10 +128,6 @@ class ConController:
         if standby is not None:
             self.v.QDoubleSpinBox_emccd_t_standby.setValue(standby)
 
-    def display_cmos_rolling_timings(self, line_exposure, line_interval):
-        self.v.QDoubleSpinBox_scmos_line_exposure.setValue(line_exposure)
-        self.v.QDoubleSpinBox_scmos_line_interval.setValue(line_interval)
-
     def display_deck_position(self, mdposz):
         self.v.QLCDNumber_deck_position.display(mdposz)
 
@@ -184,6 +139,3 @@ class ConController:
 
     def display_piezo_position_z(self, ps):
         self.v.QLCDNumber_piezo_position_z.display(ps)
-
-    def get_file_name(self):
-        return self.v.QLineEdit_filename.text()

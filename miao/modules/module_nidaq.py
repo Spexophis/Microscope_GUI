@@ -17,10 +17,9 @@ class NIDAQ:
         def __init__(self):
             self.sample_rate = 250000
             self.duty_cycle = 0.5
-            self.galvo_channels = ["Dev1/ao0", "Dev1/ao1", "Dev1/ao2"]
+            self.galvo_channels = ["Dev1/ao0", "Dev1/ao1"]
             self.piezo_channels = ["Dev2/ao0", "Dev2/ao1", "Dev2/ao2"]
-            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line2", "Dev1/port0/line3",
-                                     "Dev1/port0/line4", "Dev1/port0/line5", "Dev1/port0/line6"]
+            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line3", "Dev1/port0/line4", "Dev1/port0/line5"]
             self.counter_channel = "/Dev1/ctr0"
             self.clock_rate = 2000000
             self.clock = ["/Dev1/PFI12", "/Dev2/PFI0"]
@@ -104,53 +103,6 @@ class NIDAQ:
             with nidaqmx.Task() as task:
                 task.ai_channels.add_ai_voltage_chan("Dev2/ai0:2", min_val=-10.0, max_val=10.0)
                 task.timing.cfg_samp_clk_timing(rate=200000, sample_mode=AcquisitionType.FINITE, samps_per_chan=10,
-                                                active_edge=Edge.RISING)
-                pos = task.read(number_of_samples_per_channel=10)
-            return [sum(p) / len(p) for p in pos]
-        except nidaqmx.DaqWarning as e:
-            self.logg.warning("DaqWarning caught as exception: %s", e)
-            try:
-                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(
-                    e.error_code)
-            except AssertionError as ae:
-                self.logg.error("Assertion Error: %s", ae)
-
-    def piezo_step_callback(self, task_handle, signal_type, callback_data):
-        self.tasks["piezo_x"].write(self.ao_value[self.pzx], auto_start=True)
-        self.pzx += 1
-        if self.pzx >= 20:
-            self.pzy += 1
-            self.tasks["piezo_y"].write(self.ao_value[self.pzy], auto_start=True)
-            self.pzx = 0
-            self.tasks["piezo_x"].write(self.ao_value[self.pzx], auto_start=True)
-        return 0
-
-    def set_galvo_position(self, pos, indices=None):
-        if indices is None:
-            indices = [0, 1]
-        if len(pos) != len(indices):
-            self.logg.error("WARNING: Length of pos and indices differ, skipping galvo position update.")
-            return
-        try:
-            with nidaqmx.Task() as task:
-                for ind in indices:
-                    task.ao_channels.add_ao_voltage_chan(self.galvo_channels[ind], min_val=-10., max_val=10.)
-                task.write(pos)
-                task.wait_until_done(WAIT_INFINITELY)
-                task.stop()
-        except nidaqmx.DaqWarning as e:
-            self.logg.warning("DaqWarning caught as exception: %s", e)
-            try:
-                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(
-                    e.error_code)
-            except AssertionError as ae:
-                self.logg.error("Assertion Error: %s", ae)
-
-    def get_galvo_position(self):
-        try:
-            with nidaqmx.Task() as task:
-                task.ai_channels.add_ai_voltage_chan("Dev1/ai0:1", min_val=-10.0, max_val=10.0)
-                task.timing.cfg_samp_clk_timing(rate=500000, sample_mode=AcquisitionType.FINITE, samps_per_chan=10,
                                                 active_edge=Edge.RISING)
                 pos = task.read(number_of_samples_per_channel=10)
             return [sum(p) / len(p) for p in pos]

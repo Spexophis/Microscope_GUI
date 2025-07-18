@@ -91,9 +91,7 @@ class MainController(QtCore.QObject):
         self.v.con_view.Signal_deck_zero_position.connect(self.deck_zero_position)
         self.v.con_view.Signal_deck_move_single_step.connect(self.move_deck_single_step)
         self.v.con_view.Signal_deck_move_continuous.connect(self.move_deck_continuous)
-        # Galvo Scanners
-        self.v.con_view.Signal_galvo_set.connect(self.set_galvo)
-        self.v.con_view.Signal_galvo_scan_update.connect(self.update_galvo_scanner)
+        # Galvo Switch
         self.v.con_view.Signal_galvo_path_switch.connect(self.set_switch)
         # Cobolt Lasers
         self.v.con_view.Signal_set_laser.connect(self.set_laser)
@@ -147,8 +145,6 @@ class MainController(QtCore.QObject):
             self.con_controller.display_deck_position(p)
 
             self.reset_piezo_positions()
-            self.reset_galvo_positions()
-            self.update_galvo_scanner()
 
             self.laser_lists = ["405", "488_0", "488_1", "488_2"]
 
@@ -299,21 +295,6 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"MCL Piezo Error: {e}")
 
-    def reset_galvo_positions(self):
-        g_x, g_y = self.con_controller.get_galvo_positions()
-        try:
-            self.m.daq.set_galvo_position([g_x, g_y], [0, 1])
-            self.m.daq.set_switch_position(0.)
-        except Exception as e:
-            self.logg.error(f"Galvo Error: {e}")
-
-    @QtCore.pyqtSlot(float, float)
-    def set_galvo(self, voltx: float, volty: float):
-        try:
-            self.m.daq.set_galvo_position([voltx, volty], [0, 1])
-        except Exception as e:
-            self.logg.error(f"Galvo Error: {e}")
-
     @QtCore.pyqtSlot(float)
     def set_switch(self, volt: float):
         try:
@@ -393,9 +374,6 @@ class MainController(QtCore.QObject):
             if self.cameras[key] == 1:
                 x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
                 self.m.cam_set[1].set_roi(bx, by, x, nx, y, ny)
-            if self.cameras[key] == 2:
-                x, y, nx, ny, bx, by = self.con_controller.get_thorcam_roi()
-                self.m.cam_set[2].set_roi(x, y, x + nx - 1, y + ny - 1)
             if self.cameras[key] == 3:
                 expo = self.con_controller.get_tis_expo()
                 self.m.cam_set[3].set_exposure(expo)
@@ -407,7 +385,6 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot(int)
     def update_daq_sample_rate(self, sr: int):
         self.p.trigger.update_nidaq_parameters(sr * 1000)
-        self.update_galvo_scanner()
         self.m.daq.sample_rate = sr * 1000
 
     @QtCore.pyqtSlot()
@@ -415,20 +392,16 @@ class MainController(QtCore.QObject):
         self.m.daq.stop_triggers()
 
     @QtCore.pyqtSlot()
-    def update_galvo_scanner(self):
-        galvo_positions, galvo_ranges, dot_pos, offset, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act, sws = self.con_controller.get_galvo_scan_parameters()
-        self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges,
-                                                    foci=dot_pos, offsets=offset,
-                                                    origins_act=galvo_positions_act, ranges_act=galvo_ranges_act,
-                                                    foci_act=dot_pos_act, offsets_act=offset_act, sws=sws)
-        self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
+    def update_galvo_switch(self):
+        sws = self.con_controller.get_galvo_switch_parameters()
+        self.p.trigger.update_galvo_scan_parameters(sws=sws)
 
     def update_trigger_parameters(self, cam_key):
         """Ensure that the camera acquisition is fully set up before executing this function."""
         try:
             digital_starts, digital_ends = self.con_controller.get_digital_parameters()
             self.p.trigger.update_digital_parameters(digital_starts, digital_ends)
-            self.update_galvo_scanner()
+            self.update_galvo_switch()
             axis_lengths, step_sizes = self.con_controller.get_piezo_scan_parameters()
             pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
             positions = [pos_x[1], pos_y[1], pos_z[1]]
@@ -456,18 +429,8 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].prepare_live()
             self.update_trigger_parameters("imaging")
         if self.cameras["imaging"] == 1:
-            self.m.cam_set[self.cameras["imaging"]].mode = self.con_controller.get_scmos_mode()
-            if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
-                self.update_trigger_parameters("imaging")
-                _, _, interval_lines = self.con_controller.get_scmos_expo()
-                line_exposure, line_interval = self.p.trigger.update_lightsheet_rolling(interval_lines)
-                self.m.cam_set[self.cameras["imaging"]].line_exposure = line_exposure
-                self.m.cam_set[self.cameras["imaging"]].line_interval = line_interval
-                self.con_controller.display_cmos_rolling_timings(line_exposure, line_interval)
-                self.m.cam_set[self.cameras["imaging"]].prepare_live()
-            if self.m.cam_set[self.cameras["imaging"]].mode == "Normal":
-                self.m.cam_set[self.cameras["imaging"]].prepare_live()
-                self.update_trigger_parameters("imaging")
+            self.m.cam_set[self.cameras["imaging"]].prepare_live()
+            self.update_trigger_parameters("imaging")
         if vd_mod == "Wide Field":
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
@@ -475,26 +438,6 @@ class MainController(QtCore.QObject):
             self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
                                                        clean=self.p.trigger.initial_time,
                                                        standby=self.p.trigger.standby_time)
-        if vd_mod == "Dot Scan":
-            if self.cameras["imaging"] == 1:
-                if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
-                    self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-                    dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers_rolling(self.lasers,
-                                                                                              self.cameras["imaging"])
-                    self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                              digital_sequences=dtr, digital_channels=chs, finite=False)
-                else:
-                    dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers,
-                                                                                      self.cameras["imaging"])
-                    self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                              digital_sequences=dtr, digital_channels=chs, finite=False)
-            else:
-                dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
-                self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                          digital_sequences=dtr, digital_channels=chs, finite=False)
-                self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                           clean=self.p.trigger.initial_time,
-                                                           standby=self.p.trigger.standby_time)
         if vd_mod == "Scan Calib":
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])

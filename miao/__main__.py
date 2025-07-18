@@ -57,7 +57,7 @@ class MicroscopeGUI(QtWidgets.QMainWindow):
         self.close()
 
 
-cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_20240426.json"
+cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
 
 
 class AppWrapper:
