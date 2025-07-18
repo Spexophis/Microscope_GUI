@@ -34,6 +34,7 @@ class MainController(QtCore.QObject):
         self._set_signal_connections()
         self._initial_setup()
         self.lasers = []
+        self.slm_seq = ""
         self.cameras = {"imaging": 0, "wfs": 1, "focus_lock": 3}
         # dedicated thread pool for tasks
         self.task_worker = None
@@ -146,7 +147,10 @@ class MainController(QtCore.QObject):
 
             self.reset_piezo_positions()
 
-            self.laser_lists = ["405", "488_0", "488_1", "488_2"]
+            self.laser_lists = ["405", "488_2"]
+
+            for key in self.m.slm.ord_dict.keys():
+                self.v.con_view.QComboBox_slm_sequence.addItem(key)
 
             self.pixel_sizes = [0., 0., 0., 0.]
             self.pixel_sizes[0] = 0.068783
@@ -416,15 +420,13 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Trigger Error: {e}")
 
-    def generate_live_triggers(self, cam_key):
-        self.update_trigger_parameters(cam_key)
-        return self.p.trigger.generate_digital_triggers(self.lasers, self.cameras[cam_key])
-
     def prepare_video(self, vd_mod):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         if self.cameras["imaging"] == 0:
             self.m.cam_set[self.cameras["imaging"]].prepare_live()
             self.update_trigger_parameters("imaging")
@@ -433,7 +435,7 @@ class MainController(QtCore.QObject):
             self.update_trigger_parameters("imaging")
         if vd_mod == "Wide Field":
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-            dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+            dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
             self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
                                                        clean=self.p.trigger.initial_time,
@@ -563,7 +565,10 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def plot_trigger(self):
         try:
-            dtr, sw, dch = self.generate_live_triggers("imaging")
+            self.slm_seq = self.con_controller.get_slm_sequence()
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+            self.update_trigger_parameters("imaging")
+            dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
             self.view_controller.plot_update(dtr[0])
             for i in range(dtr.shape[0] - 1):
                 self.view_controller.plot(dtr[i + 1] + i + 1)
@@ -612,8 +617,11 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        dtr, sw, dch = self.generate_live_triggers("imaging")
+        self.update_trigger_parameters("imaging")
+        dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
         self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
@@ -739,10 +747,13 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"],
+                                                                         self.slm_seq)
         self.m.daq.set_piezo_position(pos=[ptr[0]], indices=[2])
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
@@ -790,9 +801,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"],
+                                                                         self.slm_seq)
         self.m.daq.set_piezo_position(pos=list(np.swapaxes(ptr, 0, 1)[0]), indices=pch)
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
@@ -841,10 +855,13 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         ptr, sw, dtr, dch, pch, gch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers,
-                                                                                       self.cameras["imaging"])
+                                                                                       self.cameras["imaging"],
+                                                                                       self.slm_seq)
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   digital_sequences=dtr, digital_channels=dch)
@@ -972,10 +989,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"], self.slm_seq)
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
 
@@ -1083,12 +1102,14 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         wfs = self.ao_controller.get_dm_selection()
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"], self.slm_seq)
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs)
 
     def influence_function(self):
@@ -1174,12 +1195,14 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         self.dfm.ctrl.reset_control()
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"], self.slm_seq)
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=True)
 
     def close_loop_correction(self):
@@ -1240,9 +1263,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
         if vd_mod == "Wide Field":
-            dtr, sw, dch = self.generate_live_triggers("imaging")
+            self.update_trigger_parameters("imaging")
+            dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
             self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
             self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
@@ -1592,11 +1618,13 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
         self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"], self.slm_seq)
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=True)
 
     def shwfs_acquisition(self):

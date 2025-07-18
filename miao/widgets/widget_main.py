@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -27,9 +28,6 @@ class MainWidget(QtWidgets.QMainWindow):
         self.setCentralWidget(self.view_view)
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dock_con)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_ao)
-
-        self.dock_con.setFloating(True)
-        self.dock_ao.setFloating(True)
 
         self.dialog, self.dialog_text = None, None
 
@@ -103,17 +101,17 @@ class CustomDockTitleBar(QtWidgets.QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.layout = QtWidgets.QHBoxLayout()
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(self.layout)
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
 
-        self.label = QtWidgets.QLabel(self.dock_widget.windowTitle())
-        self.layout.addWidget(self.label)
+        label = QtWidgets.QLabel(self.dock_widget.windowTitle())
+        layout.addWidget(label)
 
         self.minimize_button = QtWidgets.QToolButton()
         self.minimize_button.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_TitleBarMinButton))
         self.minimize_button.clicked.connect(self.minimize_dock_widget)
-        self.layout.addWidget(self.minimize_button)
+        layout.addWidget(self.minimize_button)
 
     def minimize_dock_widget(self):
         self.dock_widget.setFloating(False)
@@ -121,10 +119,21 @@ class CustomDockTitleBar(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
+    from miao.utilities import configurations, error_log
+    import time
+
     app = QtWidgets.QApplication(sys.argv)
-    config = None  # Replace with actual config
-    logg = None  # Replace with actual logger
-    path = ""  # Replace with actual path
-    main_widget = MainWidget(config, logg, path)
+    cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
+    cfg = configurations.MicroscopeConfiguration(cfd)
+    pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
+    try:
+        os.makedirs(pth, exist_ok=True)
+        print(f'Directory {pth} has been created successfully.')
+    except Exception as e:
+        print(f'Error creating directory {pth}: {e}')
+    log_file = os.path.join(pth, time.strftime("%H%M%S") + 'app.log')
+    lg = error_log.ErrorLog(log_file)
+
+    main_widget = MainWidget(cfg, lg, pth)
     main_widget.show()
     sys.exit(app.exec_())

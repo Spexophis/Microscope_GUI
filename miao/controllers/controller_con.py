@@ -117,6 +117,9 @@ class ConController:
     def get_acquisition_mode(self):
         return self.v.QComboBox_acquisition_modes.currentText()
 
+    def get_slm_sequence(self):
+        return self.v.QComboBox_slm_sequence.currentText()
+
     def display_camera_temperature(self, temperature):
         self.v.QLCDNumber_ccd_tempetature.display(temperature)
 

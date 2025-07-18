@@ -7,8 +7,8 @@ class TriggerSequence:
             # daq
             self.sample_rate = sample_rate  # Hz
             # digital triggers
-            self.digital_starts = [0.0000, 0.00012, 0.00012, 0.00064, 0.00064, 0.00064, 0.00064]
-            self.digital_ends = [0.0001, 0.00062, 0.00062, 0.00074, 0.00074, 0.00074, 0.00074]
+            self.digital_starts = [0.0000, 0.00064, 0.00064, 0.00064]
+            self.digital_ends = [0.0001, 0.00074, 0.00074, 0.00074]
             self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
             self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
             # piezo scanner
@@ -120,36 +120,6 @@ class TriggerSequence:
         if self.cycle_time is not None:
             self.cycle_time = cycle_time
 
-    def generate_digital_triggers(self, lasers, camera, slm_seq=None):
-        cam_ind = camera + 4
-        digital_channels = lasers.copy()
-        digital_channels.append(cam_ind)
-        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
-        act_seq, cam_seq, self.exposure_time, self.exposure_samples = self.generate_slm_triggers(slm_seq)
-        dark_samples = int(act_seq.shape[0] / 2)
-        offset_samples = max(self.standby_samples - dark_samples, 0)
-        if len(digital_channels) == 2:
-            cycle_samples = interval_samples + act_seq.shape[0] + offset_samples
-            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
-            digital_trigger[0][interval_samples:interval_samples + act_seq.shape[0]] = act_seq
-            digital_trigger[1][interval_samples:interval_samples + cam_seq.shape[0]] = cam_seq
-            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
-            switch_trigger[interval_samples:interval_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
-        elif len(digital_channels) == 3:
-            expo_samples = self.digital_ends[lasers[0]] - self.digital_starts[lasers[0]]
-            interp_samples = max(interval_samples, expo_samples)
-            cycle_samples = interp_samples + act_seq.shape[0] + offset_samples
-            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
-            digital_trigger[0][:expo_samples] = 1
-            digital_trigger[1][interp_samples:interp_samples + act_seq.shape[0]] = act_seq
-            digital_trigger[2][interp_samples:interp_samples + cam_seq.shape[0]] = cam_seq
-            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
-            switch_trigger[interp_samples:interp_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
-        else:
-            self.logg.error("Digital channels error.")
-            raise ValueError("Digital channels number is wrong.")
-        return digital_trigger, switch_trigger, digital_channels
-
     def generate_slm_triggers(self, slm_seq="5ms_dark_pair"):
         if slm_seq == "400us_lit_balanced":
             samps_total = round(776.64e-6 * self.sample_rate)
@@ -203,8 +173,38 @@ class TriggerSequence:
             raise ValueError("SLM sequence is wrong.")
         return act_seq, cam_seq, expo_on, samps_on
 
-    def generate_digital_triggers_for_scan(self, lasers, camera):
-        digital_triggers, switch_trigger, chs = self.generate_digital_triggers(lasers, camera)
+    def generate_digital_triggers(self, lasers, camera, slm_seq):
+        cam_ind = camera + 4
+        digital_channels = lasers.copy()
+        digital_channels.append(cam_ind)
+        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
+        act_seq, cam_seq, self.exposure_time, self.exposure_samples = self.generate_slm_triggers(slm_seq)
+        dark_samples = int(act_seq.shape[0] / 2)
+        offset_samples = max(self.standby_samples - dark_samples, 0)
+        if len(digital_channels) == 2:
+            cycle_samples = interval_samples + act_seq.shape[0] + offset_samples
+            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+            digital_trigger[0][interval_samples:interval_samples + act_seq.shape[0]] = act_seq
+            digital_trigger[1][interval_samples:interval_samples + cam_seq.shape[0]] = cam_seq
+            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+            switch_trigger[interval_samples:interval_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+        elif len(digital_channels) == 3:
+            expo_samples = self.digital_ends[lasers[0]] - self.digital_starts[lasers[0]]
+            interp_samples = max(interval_samples, expo_samples)
+            cycle_samples = interp_samples + act_seq.shape[0] + offset_samples
+            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+            digital_trigger[0][:expo_samples] = 1
+            digital_trigger[1][interp_samples:interp_samples + act_seq.shape[0]] = act_seq
+            digital_trigger[2][interp_samples:interp_samples + cam_seq.shape[0]] = cam_seq
+            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+            switch_trigger[interp_samples:interp_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+        else:
+            self.logg.error("Digital channels error.")
+            raise ValueError("Digital channels number is wrong.")
+        return digital_trigger, switch_trigger, digital_channels
+
+    def generate_digital_triggers_for_scan(self, lasers, camera, slm_seq):
+        digital_triggers, switch_trigger, chs = self.generate_digital_triggers(lasers, camera, slm_seq)
         if self.standby_samples > self.return_samples:
             cycle_samples = digital_triggers.shape[1]
         else:
@@ -216,8 +216,8 @@ class TriggerSequence:
             switch_trigger = np.concatenate((switch_trigger, compensate_sequence))
         return digital_triggers, switch_trigger, cycle_samples, chs
 
-    def generate_piezo_scan(self, lasers, camera):
-        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera)
+    def generate_piezo_scan(self, lasers, camera, slm_seq):
+        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera, slm_seq)
         pos = 1
         pz_chs = []
         for i in range(3):
@@ -237,8 +237,8 @@ class TriggerSequence:
             switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[pch])
         return digital_triggers, switch_trigger, convert_list(piezo_sequences), dig_chs, pz_chs, pos
 
-    def generate_piezo_line_scan(self, lasers, camera):
-        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera)
+    def generate_piezo_line_scan(self, lasers, camera, slm_seq):
+        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera, slm_seq)
         pz_chs = []
         for i in range(3):
             if self.piezo_scan_pos[i] > 0:

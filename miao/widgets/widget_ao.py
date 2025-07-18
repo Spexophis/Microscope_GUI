@@ -87,38 +87,6 @@ class AOWidget(QtWidgets.QWidget):
     def _create_parameters_widgets(self):
         layout_parameters = QtWidgets.QHBoxLayout()
 
-        self.QLabel_wfrmd_foc = cw.LabelWidget(str('Method'))
-        self.QComboBox_wfrmd_foc = cw.ComboBoxWidget(list_items=['correlation', 'centerofmass'])
-        self.QSpinBox_base_xcenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_base_ycenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_xcenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_ycenter_foc = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_n_lenslets_x_foc = cw.SpinBoxWidget(0, 64, 1, 14)
-        self.QSpinBox_n_lenslets_y_foc = cw.SpinBoxWidget(0, 64, 1, 14)
-        self.QSpinBox_spacing_foc = cw.SpinBoxWidget(0, 64, 1, 26)
-        self.QSpinBox_radius_foc = cw.SpinBoxWidget(0, 64, 1, 12)
-        self.QDoubleSpinBox_foc_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
-        self.confocal_shwfs_parameters_scroll_area, confocal_shwfs_parameters_scroll_layout = cw.create_scroll_area()
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Illumination')))
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Method')), self.QComboBox_wfrmd_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Base)')),
-                                                       self.QSpinBox_base_xcenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Base)')),
-                                                       self.QSpinBox_base_ycenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Offset)')),
-                                                       self.QSpinBox_offset_xcenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Offset)')),
-                                                       self.QSpinBox_offset_ycenter_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet X')),
-                                                       self.QSpinBox_n_lenslets_x_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet Y')),
-                                                       self.QSpinBox_n_lenslets_y_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Spacing')), self.QSpinBox_spacing_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Radius')), self.QSpinBox_radius_foc)
-        confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
-                                                       self.QDoubleSpinBox_foc_background)
-
         self.QComboBox_wfrmd_img = cw.ComboBoxWidget(list_items=['correlation', 'centerofmass'])
         self.QSpinBox_base_xcenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
         self.QSpinBox_base_ycenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
@@ -130,8 +98,6 @@ class AOWidget(QtWidgets.QWidget):
         self.QSpinBox_radius_img = cw.SpinBoxWidget(0, 64, 1, 12)
         self.QDoubleSpinBox_img_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
         self.image_shwfs_parameters_scroll_area, image_shwfs_parameters_scroll_layout = cw.create_scroll_area()
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Imaging')))
-        image_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
         image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Method')), self.QComboBox_wfrmd_img)
         image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Base)')),
                                                     self.QSpinBox_base_xcenter_img)
@@ -148,14 +114,13 @@ class AOWidget(QtWidgets.QWidget):
         image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
                                                     self.QDoubleSpinBox_img_background)
 
-        layout_parameters.addWidget(self.confocal_shwfs_parameters_scroll_area)
         layout_parameters.addWidget(self.image_shwfs_parameters_scroll_area)
         return layout_parameters
 
     def _create_shwfs_widgets(self):
         layout_shwfs = QtWidgets.QHBoxLayout()
 
-        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "Thorlabs"])
+        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS"])
         self.QPushButton_img_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
         self.QPushButton_run_img_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
         self.QPushButton_run_img_wfr = cw.PushButtonWidget('RunWFR', enable=True)

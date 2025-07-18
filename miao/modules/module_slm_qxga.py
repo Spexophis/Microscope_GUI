@@ -109,7 +109,7 @@ class QXGA:
         odn = self.get_order_num()
         for i in range(odn):
             ord_name = self.get_order_name(i)
-            ord_dict[i] = ord_name.decode('utf-8')
+            ord_dict[ord_name.decode('utf-8')] = i
         return ord_dict
 
     def select_order(self, n):

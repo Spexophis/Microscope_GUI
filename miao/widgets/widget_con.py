@@ -12,7 +12,7 @@ class ConWidget(QtWidgets.QWidget):
     Signal_deck_zero_position = QtCore.pyqtSignal()
     Signal_deck_move_single_step = QtCore.pyqtSignal(bool)
     Signal_deck_move_continuous = QtCore.pyqtSignal(bool, int, float)
-    Signal_galvo_path_switch = QtCore.pyqtSignal(float)
+    Signal_galvo_path_switch = QtCore.pyqtSignal(str, float)
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
     Signal_daq_update = QtCore.pyqtSignal(int)
     Signal_daq_reset = QtCore.pyqtSignal()
@@ -39,7 +39,6 @@ class ConWidget(QtWidgets.QWidget):
         self.data_folder = path
         self._setup_ui()
         self.load_spinbox_values()
-        self.galvo_scan_presets = self.load_galvo_scan_presets()
         self.digital_timing_presets = self.load_digital_timing_presets()
         self._set_signal_connections()
 
@@ -64,7 +63,6 @@ class ConWidget(QtWidgets.QWidget):
             "position": cw.create_dock("Position"),
             "laser": cw.create_dock("Laser"),
             "daq": cw.create_dock("Daq"),
-            "video": cw.create_dock("Live Imaging"),
             "acquisition": cw.create_dock("Data Acquisition")
         }
 
@@ -74,7 +72,6 @@ class ConWidget(QtWidgets.QWidget):
             "position": self._create_position_widgets(),
             "laser": self._create_laser_widgets(),
             "daq": self._create_daq_widgets(),
-            "video": self._create_video_widgets(),
             "acquisition": self._create_acquisition_widgets()
         }
 
@@ -158,7 +155,6 @@ class ConWidget(QtWidgets.QWidget):
 
         layout_camera.addWidget(self.emccd_scroll_area)
         layout_camera.addWidget(self.scmos_scroll_area)
-        layout_camera.addWidget(self.thorcam_scroll_area)
         layout_camera.addWidget(self.tis_scroll_area)
         return layout_camera
 
@@ -252,11 +248,11 @@ class ConWidget(QtWidgets.QWidget):
 
         self.QDoubleSpinBox_path_switch_galvo_x = cw.DoubleSpinBoxWidget(-10.0, 10.0, 0.1, 4, 5)
         self.QDoubleSpinBox_path_switch_galvo_y = cw.DoubleSpinBoxWidget(-10.0, 10.0, 0.1, 4, 5)
-        self.galvo_scroll_area, galvo_scroll_layout = cw.create_scroll_area("Grid")
-        galvo_scroll_layout.addWidget(cw.LabelWidget(str('Path Switch X')), 0, 0)
-        galvo_scroll_layout.addWidget(self.QDoubleSpinBox_path_switch_galvo, 0, 1)
-        galvo_scroll_layout.addWidget(cw.LabelWidget(str('Path Switch Y')), 1, 0)
-        galvo_scroll_layout.addWidget(self.QDoubleSpinBox_path_switch_galvo, 1, 1)
+        self.galvo_scroll_area, galvo_scroll_layout = cw.create_scroll_area()
+        galvo_scroll_layout.addRow(cw.LabelWidget(str('Path Switcher')))
+        galvo_scroll_layout.addRow(cw.FrameWidget())
+        galvo_scroll_layout.addRow(cw.LabelWidget(str('Path Switch X')), self.QDoubleSpinBox_path_switch_galvo_x)
+        galvo_scroll_layout.addRow(cw.LabelWidget(str('Path Switch Y')), self.QDoubleSpinBox_path_switch_galvo_y)
 
         layout_position.addWidget(self.mad_deck_scroll_area)
         layout_position.addWidget(self.mcl_piezo_scroll_area)
@@ -322,10 +318,11 @@ class ConWidget(QtWidgets.QWidget):
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_tis, 2, 9, 1, 1)
         return layout_daq
 
-    def _create_video_widgets(self):
-        layout_video = QtWidgets.QHBoxLayout()
+    def _create_acquisition_widgets(self):
+        layout_acquisition = QtWidgets.QGridLayout()
         self.QComboBox_imaging_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "TIS"])
-        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Dot Scan", "Focus Lock", "Scan Calib"])
+        self.QComboBox_slm_sequence = cw.ComboBoxWidget(list_items=[])
+        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Focus Lock", "Scan Calib"])
         self.QPushButton_video = cw.PushButtonWidget("Video", checkable=True)
         self.QPushButton_fft = cw.PushButtonWidget("FFT", checkable=True, enable=False)
         self.QComboBox_profile_axis = cw.ComboBoxWidget(list_items=["X", "Y"])
@@ -333,39 +330,35 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_add_profile = cw.PushButtonWidget("Plot Profile")
         self.QPushButton_set_mask = cw.PushButtonWidget("Set Mask")
         self.QPushButton_save_live_timing_presets = cw.PushButtonWidget("Save Live TTLs")
-        layout_video.addWidget(self.QComboBox_imaging_camera_selection)
-        layout_video.addWidget(self.QComboBox_live_modes)
-        layout_video.addWidget(self.QPushButton_video)
-        layout_video.addWidget(self.QPushButton_fft)
-        layout_video.addWidget(self.QComboBox_profile_axis)
-        layout_video.addWidget(self.QPushButton_plot_profile)
-        layout_video.addWidget(self.QPushButton_add_profile)
-        layout_video.addWidget(self.QPushButton_save_live_timing_presets)
-        layout_video.addWidget(self.QPushButton_set_mask)
-        return layout_video
-
-    def _create_acquisition_widgets(self):
-        layout_acquisition = QtWidgets.QGridLayout()
         self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Wide Field 3D",
                                                                          "Monalisa Scan 2D", "Monalisa Scan 3D",
-                                                                         "Dot Scan 2D", "Dot Scan 3D",
                                                                          "Point Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)
-        self.QPushButton_alignment = cw.PushButtonWidget('Alignment')
         self.QPushButton_acquire = cw.PushButtonWidget('Acquire')
-        self.QPushButton_focal_array_scan = cw.PushButtonWidget('FocalArray Scan')
-        self.QPushButton_grid_pattern_scan = cw.PushButtonWidget('GridPattern Scan')
         self.QPushButton_save_acquisition_timing_presets = cw.PushButtonWidget("Save Acq TTLs")
-        layout_acquisition.addWidget(cw.LabelWidget(str('Acq Modes')), 0, 0)
-        layout_acquisition.addWidget(self.QComboBox_acquisition_modes, 1, 0)
-        layout_acquisition.addWidget(cw.LabelWidget(str('Acq Number')), 0, 1)
-        layout_acquisition.addWidget(self.QSpinBox_acquisition_number, 1, 1)
-        layout_acquisition.addWidget(self.QPushButton_alignment, 0, 2)
-        layout_acquisition.addWidget(self.QPushButton_acquire, 1, 2)
-        layout_acquisition.addWidget(self.QPushButton_grid_pattern_scan, 0, 3)
-        layout_acquisition.addWidget(self.QPushButton_focal_array_scan, 1, 3)
-        layout_acquisition.addWidget(self.QPushButton_save_acquisition_timing_presets, 1, 4)
 
+        layout_acquisition.addWidget(cw.LabelWidget(str('Camera')), 0, 0, 1, 1)
+        layout_acquisition.addWidget(self.QComboBox_imaging_camera_selection, 1, 0, 1, 1)
+        layout_acquisition.addWidget(cw.LabelWidget(str('SLM')), 0, 1, 1, 1)
+        layout_acquisition.addWidget(self.QComboBox_slm_sequence, 1, 1, 1, 1)
+        layout_acquisition.addWidget(cw.LabelWidget(str('Live Mode')), 0, 2, 1, 1)
+        layout_acquisition.addWidget(self.QComboBox_live_modes, 1, 2, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_video, 0, 3, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_fft, 1, 3, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_set_mask, 0, 4, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_save_live_timing_presets, 1, 4, 1, 1)
+        layout_acquisition.addWidget(cw.FrameWidget(), 2, 0, 1, 5)
+        layout_acquisition.addWidget(cw.LabelWidget(str('Axis')), 3, 0, 1, 1)
+        layout_acquisition.addWidget(self.QComboBox_profile_axis, 3, 1, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_plot_profile, 3, 2, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_add_profile, 3, 3, 1, 1)
+        layout_acquisition.addWidget(cw.FrameWidget(), 4, 0, 1, 5)
+        layout_acquisition.addWidget(cw.LabelWidget(str('Acq Modes')), 5, 0, 1, 1)
+        layout_acquisition.addWidget(self.QComboBox_acquisition_modes, 6, 0, 1, 1)
+        layout_acquisition.addWidget(cw.LabelWidget(str('Acq Number')), 5, 1, 1, 1)
+        layout_acquisition.addWidget(self.QSpinBox_acquisition_number, 6, 1, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_acquire, 5, 2, 1, 1)
+        layout_acquisition.addWidget(self.QPushButton_save_acquisition_timing_presets, 6, 3, 1, 1)
         return layout_acquisition
 
     def _set_signal_connections(self):
@@ -382,8 +375,8 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_move_deck_up.clicked.connect(self.deck_move_up)
         self.QPushButton_move_deck_down.clicked.connect(self.deck_move_down)
         self.QPushButton_move_deck.clicked.connect(self.deck_move_range)
-        self.QDoubleSpinBox_path_switch_galvo_x.valueChanged.connect(self.set_path_switch_galvo)
-        self.QDoubleSpinBox_path_switch_galvo_y.valueChanged.connect(self.set_path_switch_galvo)
+        self.QDoubleSpinBox_path_switch_galvo_x.valueChanged.connect(self.set_path_switch_galvo_x)
+        self.QDoubleSpinBox_path_switch_galvo_y.valueChanged.connect(self.set_path_switch_galvo_y)
         self.QPushButton_laser_405.clicked.connect(self.set_laser_405)
         self.QPushButton_laser_488_2.clicked.connect(self.set_laser_488_2)
         self.QSpinBox_daq_sample_rate.valueChanged.connect(self.update_daq)
@@ -397,9 +390,6 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_add_profile.clicked.connect(self.run_add_profile)
         self.QPushButton_set_mask.clicked.connect(self.set_array_mask)
         self.QPushButton_acquire.clicked.connect(self.run_acquisition)
-        self.QPushButton_alignment.clicked.connect(self.run_alignment)
-        self.QPushButton_focal_array_scan.clicked.connect(self.run_array_scan)
-        self.QPushButton_grid_pattern_scan.clicked.connect(self.run_pattern_scan)
         self.QComboBox_live_modes.currentIndexChanged[str].connect(self.load_selected_digital_timing_presets)
         self.QComboBox_acquisition_modes.currentIndexChanged[str].connect(self.load_selected_digital_timing_presets)
         self.QPushButton_save_live_timing_presets.clicked.connect(lambda: self.save_digital_timing_preset("live"))
@@ -416,6 +406,28 @@ class ConWidget(QtWidgets.QWidget):
             self.QPushButton_emccd_cooler_switch.setText("Cooler ON")
         else:
             self.QPushButton_emccd_cooler_switch.setText("Cooler OFF")
+
+    @QtCore.pyqtSlot()
+    def read_deck(self):
+        self.Signal_deck_read_position.emit()
+
+    @QtCore.pyqtSlot()
+    def zero_deck(self):
+        self.Signal_deck_zero_position.emit()
+
+    @QtCore.pyqtSlot()
+    def deck_move_up(self):
+        self.Signal_deck_move_single_step.emit(True)
+
+    @QtCore.pyqtSlot()
+    def deck_move_down(self):
+        self.Signal_deck_move_single_step.emit(False)
+
+    @QtCore.pyqtSlot(bool)
+    def deck_move_range(self, checked: bool):
+        distance = self.QSpinBox_deck_direction.value()
+        velocity = self.QDoubleSpinBox_deck_velocity.value()
+        self.Signal_deck_move_continuous.emit(checked, distance, velocity)
 
     @QtCore.pyqtSlot(float)
     def set_piezo_x(self, pos_x: float):
@@ -453,31 +465,13 @@ class ConWidget(QtWidgets.QWidget):
         pos_y = self.QDoubleSpinBox_stage_y.value()
         self.Signal_piezo_move_usb.emit("z", pos_x, pos_y, pos_z)
 
-    @QtCore.pyqtSlot()
-    def read_deck(self):
-        self.Signal_deck_read_position.emit()
-
-    @QtCore.pyqtSlot()
-    def zero_deck(self):
-        self.Signal_deck_zero_position.emit()
-
-    @QtCore.pyqtSlot()
-    def deck_move_up(self):
-        self.Signal_deck_move_single_step.emit(True)
-
-    @QtCore.pyqtSlot()
-    def deck_move_down(self):
-        self.Signal_deck_move_single_step.emit(False)
-
-    @QtCore.pyqtSlot(bool)
-    def deck_move_range(self, checked: bool):
-        distance = self.QSpinBox_deck_direction.value()
-        velocity = self.QDoubleSpinBox_deck_velocity.value()
-        self.Signal_deck_move_continuous.emit(checked, distance, velocity)
+    @QtCore.pyqtSlot(float)
+    def set_path_switch_galvo_x(self, value: float):
+        self.Signal_galvo_path_switch.emit("x", value)
 
     @QtCore.pyqtSlot(float)
-    def set_path_switch_galvo(self, value: float):
-        self.Signal_galvo_path_switch.emit(value)
+    def set_path_switch_galvo_y(self, value: float):
+        self.Signal_galvo_path_switch.emit("y", value)
 
     @QtCore.pyqtSlot(bool)
     def set_laser_488_2(self, checked: bool):
@@ -629,15 +623,6 @@ class ConWidget(QtWidgets.QWidget):
     def load_digital_timing_presets(self):
         try:
             presets = self.config.load_config(self.config.configs["Digital Timing Presets"])
-            return presets
-        except FileNotFoundError:
-            return {}
-
-    def load_galvo_scan_presets(self):
-        try:
-            presets = self.config.load_config(self.config.configs["Galvo Scan Presets"])
-            for name, value in presets.items():
-                self.QComboBox_galvo_scan_presets.addItem(name)
             return presets
         except FileNotFoundError:
             return {}
