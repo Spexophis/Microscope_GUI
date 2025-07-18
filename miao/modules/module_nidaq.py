@@ -114,10 +114,10 @@ class NIDAQ:
             except AssertionError as ae:
                 self.logg.error("Assertion Error: %s", ae)
 
-    def set_switch_position(self, pos):
+    def set_switch_position(self, axis, pos):
         try:
             with nidaqmx.Task() as task:
-                task.ao_channels.add_ao_voltage_chan(self.galvo_channels[2], min_val=-5., max_val=5.)
+                task.ao_channels.add_ao_voltage_chan(self.galvo_channels[axis], min_val=-10., max_val=10.)
                 task.write(pos)
                 task.wait_until_done(WAIT_INFINITELY)
                 task.stop()

@@ -72,7 +72,7 @@ class ViewWidget(QtWidgets.QWidget):
 
     def _set_napari_layers(self):
         self.napari_layers = {}
-        self.img_layers = {0: "Andor EMCCD", 1: "Hamamatsu sCMOS", 2: "Thorlabs CMOS", 3: "DMK 33UX250", 4: "FFT",
+        self.img_layers = {0: "Andor EMCCD", 1: "Hamamatsu sCMOS", 3: "DMK 33UX250", 4: "FFT",
                            5: "ShackHartmann(Base)", 6: "Wavefront", 7: "Array Mask"}
         for name in reversed(list(self.img_layers.values())):
             self.napari_layers[name] = self.add_napari_layer(name)

@@ -25,13 +25,6 @@ class ConController:
                 self.v.QSpinBox_scmos_coordinate_nx.value(), self.v.QSpinBox_scmos_coordinate_ny.value(),
                 self.v.QSpinBox_scmos_coordinate_binx.value(), self.v.QSpinBox_scmos_coordinate_biny.value()]
 
-    def get_scmos_mode(self):
-        return self.v.QComboBox_scmos_sensor_modes.currentText()
-
-    def get_scmos_expo(self):
-        return [self.v.QDoubleSpinBox_scmos_line_exposure.value(), self.v.QDoubleSpinBox_scmos_line_interval.value(),
-                self.v.QDoubleSpinBox_scmos_interval_lines.value()]
-
     def set_scmos_expo(self, t):
         self.v.QDoubleSpinBox_scmos_exposure_time.setValue(t)
 
@@ -78,19 +71,13 @@ class ConController:
 
     def get_digital_parameters(self):
         digital_starts = [self.v.QDoubleSpinBox_ttl_start_on_405.value(),
-                          self.v.QDoubleSpinBox_ttl_start_off_488_0.value(),
-                          self.v.QDoubleSpinBox_ttl_start_off_488_1.value(),
                           self.v.QDoubleSpinBox_ttl_start_read_488_2.value(),
                           self.v.QDoubleSpinBox_ttl_start_emccd.value(),
-                          self.v.QDoubleSpinBox_ttl_start_scmos.value(),
-                          self.v.QDoubleSpinBox_ttl_start_thorcam.value()]
+                          self.v.QDoubleSpinBox_ttl_start_scmos.value()]
         digital_ends = [self.v.QDoubleSpinBox_ttl_stop_on_405.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_off_488_0.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_off_488_1.value(),
                         self.v.QDoubleSpinBox_ttl_stop_read_488_2.value(),
                         self.v.QDoubleSpinBox_ttl_stop_emccd.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_scmos.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_thorcam.value()]
+                        self.v.QDoubleSpinBox_ttl_stop_scmos.value()]
         return digital_starts, digital_ends
 
     def get_piezo_scan_parameters(self):
@@ -105,7 +92,7 @@ class ConController:
 
     def get_galvo_switch_parameters(self):
         swx = [self.v.QDoubleSpinBox_emccd_gvs.value(), self.v.QDoubleSpinBox_scmos_gvs.value(),
-               self.v.QDoubleSpinBox_thorcam_gvs.value()]
+               self.v.QDoubleSpinBox_tis_gvs.value()]
         return swx
 
     def get_profile_axis(self):

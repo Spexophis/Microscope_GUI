@@ -121,7 +121,8 @@ class TriggerSequence:
             self.cycle_time = cycle_time
 
     def generate_slm_triggers(self, slm_seq="5ms_dark_pair"):
-        if slm_seq == "400us_lit_balanced":
+        if "400us" in slm_seq:
+            # "400us_lit_balanced"
             samps_total = round(776.64e-6 * self.sample_rate)
             expo_on = 400e-6
             samps_on = round(expo_on * self.sample_rate)
@@ -131,7 +132,8 @@ class TriggerSequence:
             act_seq[:samps_total] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
-        elif slm_seq == "600us_lit_balanced":
+        elif "600us" in slm_seq:
+            # "600us_lit_balanced"
             samps_total = round(976.747e-6 * self.sample_rate)
             expo_on = 600.107e-6
             samps_on = round(expo_on * self.sample_rate)
@@ -141,31 +143,37 @@ class TriggerSequence:
             act_seq[:samps_total] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
-        elif slm_seq == "5ms_dark_pair":
+        elif "5ms" in slm_seq:
+            # "5ms_dark_pair"
             samps_total = round(5.31072e-3 * self.sample_rate)
             expo_on = 5.0e-3
             samps_on = round(expo_on * self.sample_rate)
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(5.270187e-3 * self.sample_rate)
-            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            act_seq[:samps_total] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
-        elif slm_seq == "10ms_dark_pair":
+        elif "10ms" in slm_seq:
+            # "10ms_dark_pair"
             samps_total = round(10.31072e-3 * self.sample_rate)
             expo_on = 10.0e-3
             samps_on = round(expo_on * self.sample_rate)
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(10.270187e-3 * self.sample_rate)
-            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            act_seq[:samps_total] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
-        elif slm_seq == "20ms_dark_pair":
+        elif "20ms" in slm_seq:
+            # "20ms_dark_pair"
             samps_total = round(20.31072e-3 * self.sample_rate)
             expo_on = 20.0e-3
             samps_on = round(expo_on * self.sample_rate)
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(20.270187e-3 * self.sample_rate)
-            act_seq = np.ones(samps_total * 2, dtype=np.uint8)
+            act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
+            act_seq[:samps_total] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         else:
@@ -174,7 +182,7 @@ class TriggerSequence:
         return act_seq, cam_seq, expo_on, samps_on
 
     def generate_digital_triggers(self, lasers, camera, slm_seq):
-        cam_ind = camera + 4
+        cam_ind = camera + 2
         digital_channels = lasers.copy()
         digital_channels.append(cam_ind)
         interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
@@ -258,7 +266,7 @@ class TriggerSequence:
         fast_x, slow_y, fv, samples_x, line, offset = ramp_libs[span]
         # digital TTL
         cam_sw = self.galvo_sw_states[camera]
-        cam_ind = camera + 4
+        cam_ind = camera + 2
         digital_channels = lasers.copy()
         initial_offset = max(self.initial_samples, self.galvo_sw_settle_samples)
         if initial_offset > self.digital_starts[cam_ind]:

@@ -12,7 +12,7 @@ class ConWidget(QtWidgets.QWidget):
     Signal_deck_zero_position = QtCore.pyqtSignal()
     Signal_deck_move_single_step = QtCore.pyqtSignal(bool)
     Signal_deck_move_continuous = QtCore.pyqtSignal(bool, int, float)
-    Signal_galvo_path_switch = QtCore.pyqtSignal(str, float)
+    Signal_galvo_path_switch = QtCore.pyqtSignal(int, float)
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
     Signal_daq_update = QtCore.pyqtSignal(int)
     Signal_daq_reset = QtCore.pyqtSignal()
@@ -24,9 +24,6 @@ class ConWidget(QtWidgets.QWidget):
     Signal_plot_profile = QtCore.pyqtSignal(bool)
     Signal_add_profile = QtCore.pyqtSignal()
     Signal_set_mask = QtCore.pyqtSignal()
-    Signal_focal_array_scan = QtCore.pyqtSignal()
-    Signal_grid_pattern_scan = QtCore.pyqtSignal()
-    Signal_alignment = QtCore.pyqtSignal()
     Signal_data_acquire = QtCore.pyqtSignal(str, int)
     Signal_save_file = QtCore.pyqtSignal(str)
 
@@ -91,7 +88,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_emccd_t_clean = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.009)
         self.QDoubleSpinBox_emccd_exposure_time = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.001)
         self.QDoubleSpinBox_emccd_t_standby = cw.DoubleSpinBoxWidget(0, 10, 0.001, 5, 0.050)
-        self.QDoubleSpinBox_emccd_gvs = cw.DoubleSpinBoxWidget(-5., 5., 0.01, 2, 5.)
+        self.QDoubleSpinBox_emccd_gvs = cw.DoubleSpinBoxWidget(-10., 10., 0.01, 2, -9.)
         self.emccd_scroll_area, emccd_scroll_layout = cw.create_scroll_area()
         emccd_scroll_layout.addRow(cw.LabelWidget(str('EMCCD')))
         emccd_scroll_layout.addRow(cw.FrameWidget())
@@ -119,7 +116,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QSpinBox_scmos_coordinate_ny = cw.SpinBoxWidget(0, 2048, 1, 2048)
         self.QSpinBox_scmos_coordinate_binx = cw.SpinBoxWidget(0, 2048, 1, 1)
         self.QSpinBox_scmos_coordinate_biny = cw.SpinBoxWidget(0, 2048, 1, 1)
-        self.QDoubleSpinBox_scmos_gvs = cw.DoubleSpinBoxWidget(-5., 5., 0.01, 2, -2.)
+        self.QDoubleSpinBox_scmos_gvs = cw.DoubleSpinBoxWidget(-10., 10., 0.01, 2, 8.)
         self.scmos_scroll_area, scmos_scroll_layout = cw.create_scroll_area()
         scmos_scroll_layout.addRow(cw.LabelWidget(str('sCMOS')))
         scmos_scroll_layout.addRow(cw.FrameWidget())
@@ -142,6 +139,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QSpinBox_tis_coordinate_ny = cw.SpinBoxWidget(0, 2048, 1, 2048)
         self.QSpinBox_tis_coordinate_binx = cw.SpinBoxWidget(0, 2447, 1, 1)
         self.QSpinBox_tis_coordinate_biny = cw.SpinBoxWidget(0, 2047, 1, 1)
+        self.QDoubleSpinBox_tis_gvs = cw.DoubleSpinBoxWidget(-10., 10., 0.01, 2, 0.)
         self.tis_scroll_area, tis_scroll_layout = cw.create_scroll_area()
         tis_scroll_layout.addRow(cw.LabelWidget(str('TIS')))
         tis_scroll_layout.addRow(cw.FrameWidget())
@@ -152,6 +150,7 @@ class ConWidget(QtWidgets.QWidget):
         tis_scroll_layout.addRow(cw.LabelWidget(str('Ny')), self.QSpinBox_tis_coordinate_ny)
         tis_scroll_layout.addRow(cw.LabelWidget(str('Binx')), self.QSpinBox_tis_coordinate_binx)
         tis_scroll_layout.addRow(cw.LabelWidget(str('Biny')), self.QSpinBox_tis_coordinate_biny)
+        tis_scroll_layout.addRow(cw.LabelWidget(str('GalvoSW')), self.QDoubleSpinBox_tis_gvs)
 
         layout_camera.addWidget(self.emccd_scroll_area)
         layout_camera.addWidget(self.scmos_scroll_area)
@@ -467,11 +466,11 @@ class ConWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(float)
     def set_path_switch_galvo_x(self, value: float):
-        self.Signal_galvo_path_switch.emit("x", value)
+        self.Signal_galvo_path_switch.emit(0, value)
 
     @QtCore.pyqtSlot(float)
     def set_path_switch_galvo_y(self, value: float):
-        self.Signal_galvo_path_switch.emit("y", value)
+        self.Signal_galvo_path_switch.emit(1, value)
 
     @QtCore.pyqtSlot(bool)
     def set_laser_488_2(self, checked: bool):
@@ -548,18 +547,6 @@ class ConWidget(QtWidgets.QWidget):
         acq_mode = self.QComboBox_acquisition_modes.currentText()
         acq_num = self.QSpinBox_acquisition_number.value()
         self.Signal_data_acquire.emit(acq_mode, acq_num)
-
-    @QtCore.pyqtSlot()
-    def run_alignment(self):
-        self.Signal_alignment.emit()
-
-    @QtCore.pyqtSlot()
-    def run_array_scan(self):
-        self.Signal_focal_array_scan.emit()
-
-    @QtCore.pyqtSlot()
-    def run_pattern_scan(self):
-        self.Signal_grid_pattern_scan.emit()
 
     @QtCore.pyqtSlot(str)
     def load_selected_digital_timing_presets(self, text: str):
