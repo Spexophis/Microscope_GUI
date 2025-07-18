@@ -104,9 +104,9 @@ class ConController:
         return self.v.QDoubleSpinBox_piezo_return_time.value()
 
     def get_galvo_switch_parameters(self):
-        sws = [self.v.QDoubleSpinBox_emccd_gvs.value(), self.v.QDoubleSpinBox_scmos_gvs.value(),
+        swx = [self.v.QDoubleSpinBox_emccd_gvs.value(), self.v.QDoubleSpinBox_scmos_gvs.value(),
                self.v.QDoubleSpinBox_thorcam_gvs.value()]
-        return sws
+        return swx
 
     def get_profile_axis(self):
         return self.v.QComboBox_profile_axis.currentText()
