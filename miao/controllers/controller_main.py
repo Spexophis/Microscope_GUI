@@ -371,15 +371,16 @@ class MainController(QtCore.QObject):
                 self.m.cam_set[0].start_h, self.m.cam_set[0].end_h = x, x + nx - 1
                 self.m.cam_set[0].start_v, self.m.cam_set[0].end_v = y, y + ny - 1
                 self.m.cam_set[0].gain = self.con_controller.get_emccd_gain()
-                self.m.cam_set[0].t_exposure = self.con_controller.get_emccd_expo()
-            if self.cameras[key] == 1:
+            elif self.cameras[key] == 1:
                 x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
                 self.m.cam_set[1].set_roi(bx, by, x, nx, y, ny)
-            if self.cameras[key] == 2:
+            elif self.cameras[key] == 2:
                 expo = self.con_controller.get_tis_expo()
                 self.m.cam_set[2].set_exposure(expo)
                 x, y, nx, ny, bx, by = self.con_controller.get_tis_roi()
                 self.m.cam_set[2].set_roi(x, y, nx, ny)
+            else:
+                self.logg.error(f"Camera Error: Invalid camera")
         except Exception as e:
             self.logg.error(f"Camera Error: {e}")
 
@@ -407,8 +408,6 @@ class MainController(QtCore.QObject):
             self.p.trigger.update_camera_parameters(initial_time=self.m.cam_set[self.cameras[cam_key]].t_clean,
                                                     standby_time=self.m.cam_set[self.cameras[cam_key]].t_readout,
                                                     cycle_time=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
-            if self.cameras[cam_key] == 0:
-                self.con_controller.display_camera_timings(standby=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
             self.logg.info(f"Trigger Updated")
         except Exception as e:
             self.logg.error(f"Trigger Error: {e}")
@@ -430,9 +429,14 @@ class MainController(QtCore.QObject):
             self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                       clean=self.p.trigger.initial_time,
-                                                       standby=self.p.trigger.standby_time)
+            if self.cameras["imaging"] == 0:
+                self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                          exposure=self.p.trigger.exposure_time,
+                                                          standby=self.p.trigger.standby_time)
+            if self.cameras["imaging"] == 1:
+                self.con_controller.display_scmos_timings(clean=self.p.trigger.initial_time,
+                                                          exposure=self.p.trigger.exposure_time,
+                                                          standby=self.p.trigger.standby_time)
         if vd_mod == "Scan Calib":
             self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
@@ -619,9 +623,9 @@ class MainController(QtCore.QObject):
         dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
         self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
         self.m.cam_set[self.cameras["focus_lock"]].set_exposure(self.con_controller.get_tis_expo())
         self.m.cam_set[self.cameras["focus_lock"]].prepare_live()
 
@@ -753,9 +757,9 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
 
     def widefield_zstack(self):
         try:
@@ -806,9 +810,9 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
 
     def monalisa_scan_2d(self):
         try:
@@ -860,9 +864,9 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
 
     def point_scan(self):
         try:
@@ -992,6 +996,14 @@ class MainController(QtCore.QObject):
         dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"], self.slm_seq)
         self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["wfs"]])
         self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
+        if self.cameras["wfs"] == 0:
+            self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                      exposure=self.p.trigger.exposure_time,
+                                                      standby=self.p.trigger.standby_time)
+        if self.cameras["wfs"] == 1:
+            self.con_controller.display_scmos_timings(clean=self.p.trigger.initial_time,
+                                                      exposure=self.p.trigger.exposure_time,
+                                                      standby=self.p.trigger.standby_time)
 
     def start_img_wfs(self):
         try:
@@ -1266,9 +1278,9 @@ class MainController(QtCore.QObject):
             dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
             self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                       clean=self.p.trigger.initial_time,
-                                                       standby=self.p.trigger.standby_time)
+            self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                      exposure=self.p.trigger.exposure_time,
+                                                      standby=self.p.trigger.standby_time)
         else:
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.lasers_off()

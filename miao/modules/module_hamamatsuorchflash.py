@@ -2161,7 +2161,7 @@ class Dcam:
 class HamamatsuCamera:
     class CameraSettings:
         def __init__(self):
-            self.t_clean = 0
+            self.t_clean = 0.001
             self.t_readout = 0.002
             self.t_exposure = 0
             self.t_accumulate = 0
@@ -2298,11 +2298,11 @@ class HamamatsuCamera:
             self.logg.error(f"Failed to Set ROI Vertical Size: {v_size}")
         binn = self.dcam.prop_setgetvalue(self.properties['BINNING'], h_bin)
         if re is not False:
-            self.bin_h, self.bin_v = binn
+            self.bin_h, self.bin_v = binn, binn
             self.logg.info(f"Set Binning: {re}")
         else:
             self.logg.error(f"Failed to Set Binning: {h_bin}")
-            self.bin_h = 1
+            self.bin_h, self.bin_v = 1, 1
         self.img_size = self.pixels_x * self.pixels_y
 
     def prepare_live(self):

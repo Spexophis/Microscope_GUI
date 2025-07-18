@@ -4,29 +4,45 @@ class ConController:
         self.v = view
 
     def get_emccd_roi(self):
-        return [self.v.QSpinBox_emccd_coordinate_x.value(), self.v.QSpinBox_emccd_coordinate_y.value(),
+        return (self.v.QSpinBox_emccd_coordinate_x.value(), self.v.QSpinBox_emccd_coordinate_y.value(),
                 self.v.QSpinBox_emccd_coordinate_nx.value(), self.v.QSpinBox_emccd_coordinate_ny.value(),
-                self.v.QSpinBox_emccd_coordinate_binx.value(), self.v.QSpinBox_emccd_coordinate_biny.value()]
+                self.v.QSpinBox_emccd_coordinate_binx.value(), self.v.QSpinBox_emccd_coordinate_biny.value())
 
     def get_emccd_gain(self):
         return self.v.QSpinBox_emccd_gain.value()
 
     def get_emccd_expo(self):
-        return self.v.QDoubleSpinBox_emccd_exposure_time.value()
-
-    def set_emccd_expo(self, t):
-        self.v.QDoubleSpinBox_emccd_exposure_time.setValue(t)
+        return self.v.QDoubleSpinBox_emccd_t_expos.value()
 
     def get_ccd_clean(self):
         return self.v.QDoubleSpinBox_emccd_t_clean.value()
 
-    def get_scmos_roi(self):
-        return [self.v.QSpinBox_scmos_coordinate_x.value(), self.v.QSpinBox_scmos_coordinate_y.value(),
-                self.v.QSpinBox_scmos_coordinate_nx.value(), self.v.QSpinBox_scmos_coordinate_ny.value(),
-                self.v.QSpinBox_scmos_coordinate_binx.value(), self.v.QSpinBox_scmos_coordinate_biny.value()]
+    def display_camera_temperature(self, temperature):
+        self.v.QLCDNumber_ccd_tempetature.display(temperature)
 
-    def set_scmos_expo(self, t):
-        self.v.QDoubleSpinBox_scmos_exposure_time.setValue(t)
+    def display_emccd_timings(self, clean=None, exposure=None, standby=None):
+        if clean is not None:
+            self.v.QDoubleSpinBox_emccd_t_clean.setValue(clean)
+        if exposure is not None:
+            self.v.QDoubleSpinBox_emccd_t_expos.setValue(exposure)
+        if standby is not None:
+            self.v.QDoubleSpinBox_emccd_t_standby.setValue(standby)
+
+    def get_scmos_roi(self):
+        return (self.v.QSpinBox_scmos_coordinate_x.value(), self.v.QSpinBox_scmos_coordinate_y.value(),
+                self.v.QSpinBox_scmos_coordinate_nx.value(), self.v.QSpinBox_scmos_coordinate_ny.value(),
+                self.v.QSpinBox_scmos_coordinate_binx.value(), self.v.QSpinBox_scmos_coordinate_biny.value())
+
+    def get_scmos_expo(self):
+        return self.v.QDoubleSpinBox_scmos_t_expos.value()
+
+    def display_scmos_timings(self, clean=None, exposure=None, standby=None):
+        if clean is not None:
+            self.v.QDoubleSpinBox_scmos_t_clean.setValue(clean)
+        if exposure is not None:
+            self.v.QDoubleSpinBox_scmos_t_expos.setValue(exposure)
+        if standby is not None:
+            self.v.QDoubleSpinBox_scmos_t_standby.setValue(standby)
 
     def get_tis_expo(self):
         return self.v.QDoubleSpinBox_tis_exposure_time.value()
@@ -106,17 +122,6 @@ class ConController:
 
     def get_slm_sequence(self):
         return self.v.QComboBox_slm_sequence.currentText()
-
-    def display_camera_temperature(self, temperature):
-        self.v.QLCDNumber_ccd_tempetature.display(temperature)
-
-    def display_camera_timings(self, clean=None, exposure=None, standby=None):
-        if clean is not None:
-            self.v.QDoubleSpinBox_emccd_t_clean.setValue(clean)
-        if exposure is not None:
-            self.v.QDoubleSpinBox_emccd_exposure_time.setValue(exposure)
-        if standby is not None:
-            self.v.QDoubleSpinBox_emccd_t_standby.setValue(standby)
 
     def display_deck_position(self, mdposz):
         self.v.QLCDNumber_deck_position.display(mdposz)
