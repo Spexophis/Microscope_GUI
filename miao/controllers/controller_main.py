@@ -1224,7 +1224,7 @@ class MainController(QtCore.QObject):
 
     def set_zernike(self, factory=False):
         try:
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             indz, amp = self.ao_controller.get_zernike_mode()
             if factory:
                 self.dfm.set_dm(
@@ -1362,7 +1362,7 @@ class MainController(QtCore.QObject):
 
     def img_wfr(self):
         try:
-            self.p.shwfsr.method = self.ao_controller.get_gradient_method_img()
+            self.p.shwfsr.method = self.ao_controller.get_gradient_method_foc()
             self.p.shwfsr.wavefront_reconstruction()
         except Exception as e:
             self.logg.error(f"SHWFS Reconstruction Error: {e}")
@@ -1380,7 +1380,7 @@ class MainController(QtCore.QObject):
         self.run_task(task=self.compute_img_wf)
 
     def compute_img_wf(self):
-        md = self.ao_controller.get_gradient_method_img()
+        md = self.ao_controller.get_gradient_method_foc()
         gradx, grady = self.p.shwfsr.get_gradient_xy(mtd=md)
         a = self.dfm.get_zernike_coffs(gradx, grady)
         self.view_controller.plot_update(a, x=np.asarray(tz.modes))
@@ -1515,7 +1515,7 @@ class MainController(QtCore.QObject):
             time.sleep(0.08)
             self.p.shwfsr.meas = self.m.cam_set[self.cameras["wfs"]].get_last_image()
             self.m.daq.stop_triggers(_close=False)
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             self.dfm.get_correction(self.p.shwfsr.get_gradient_xy(), method="modal")
             self.dfm.set_dm(self.dfm.dm_cmd[-1])
             self.ao_controller.update_cmd_index()
@@ -1617,7 +1617,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             amprange = [amp_start + step_number * amp_step for step_number in range(amp_step_number)]
             results = [('Mode', 'Amp', 'Metric')]
             za = []
@@ -1746,7 +1746,7 @@ class MainController(QtCore.QObject):
         try:
             t = time.strftime("%Y%m%d%H%M_")
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             amprange = np.linspace(amp_start, -amp_start, amp_step_number + 1)
             cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
             self.m.cam_set[self.cameras["imaging"]].start_live()
@@ -1805,7 +1805,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             self.m.cam_set[self.cameras["imaging"]].start_live()
             self.dfm.set_dm(self.dfm.dm_cmd[self.dfm.current_cmd])
             self.logg.info("Automated sensorless AO iterations start")
@@ -1852,7 +1852,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_foc_wfs_method()
             za = []
             mv = []
             zp = [0] * self.dfm.n_zernike
@@ -1949,7 +1949,7 @@ class MainController(QtCore.QObject):
             self.finish_shwfs_acquisition()
             return
         try:
-            mtd = self.ao_controller.get_img_wfs_method()
+            mtd = self.ao_controller.get_foc_wfs_method()
             modes = np.arange(16)
             self.m.cam_set[self.cameras["wfs"]].start_live()
             time.sleep(0.02)
@@ -1976,7 +1976,7 @@ class MainController(QtCore.QObject):
                 self.m.daq.stop_triggers(_close=False)
                 self.p.shwfsr.ref = data[0]
                 self.p.shwfsr.meas = data[1]
-                md = self.ao_controller.get_gradient_method_img()
+                md = self.ao_controller.get_gradient_method_foc()
                 gradx, grady = self.p.shwfsr.get_gradient_xy(mtd=md)
                 amps[:, 1] = self.dfm.get_zernike_coffs(gradx, grady)
                 t = time.strftime("%Y%m%d_%H%M%S_")

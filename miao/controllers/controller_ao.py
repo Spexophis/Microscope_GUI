@@ -11,13 +11,6 @@ class AOController:
         self.v.lcdNumber_wfmax_img.display(properties[1])
         self.v.lcdNumber_wfrms_img.display(properties[2])
 
-    def get_parameters_img(self):
-        return self.v.QSpinBox_base_xcenter_img.value(), self.v.QSpinBox_base_ycenter_img.value(), \
-            self.v.QSpinBox_offset_xcenter_img.value(), self.v.QSpinBox_offset_ycenter_img.value(), \
-            self.v.QSpinBox_n_lenslets_x_img.value(), self.v.QSpinBox_n_lenslets_y_img.value(), \
-            self.v.QSpinBox_spacing_img.value(), self.v.QSpinBox_radius_img.value(), \
-            self.v.QDoubleSpinBox_img_background.value()
-
     def get_parameters_foc(self):
         return self.v.QSpinBox_base_xcenter_foc.value(), self.v.QSpinBox_base_ycenter_foc.value(), \
             self.v.QSpinBox_offset_xcenter_foc.value(), self.v.QSpinBox_offset_ycenter_foc.value(), \
@@ -25,14 +18,8 @@ class AOController:
             self.v.QSpinBox_spacing_foc.value(), self.v.QSpinBox_radius_foc.value(), \
             self.v.QDoubleSpinBox_foc_background.value()
 
-    def get_gradient_method_img(self):
-        return self.v.QComboBox_wfrmd_img.currentText()
-
     def get_gradient_method_foc(self):
         return self.v.QComboBox_wfrmd_foc.currentText()
-
-    def get_img_wfs_method(self):
-        return self.v.QComboBox_wfsmd.currentText()
 
     def get_foc_wfs_method(self):
         return self.v.QComboBox_wfsmd.currentText()
@@ -54,9 +41,6 @@ class AOController:
         self.v.QComboBox_cmd.addItem(item)
         if wst:
             self.v.QComboBox_cmd.setCurrentIndex(self.v.QComboBox_cmd.count() - 1)
-
-    def get_file_name(self):
-        return self.v.QLineEdit_filename.text()
 
     def get_ao_iteration(self):
         return self.v.QSpinBox_zernike_mode_start.value(), self.v.QSpinBox_zernike_mode_stop.value(), \
