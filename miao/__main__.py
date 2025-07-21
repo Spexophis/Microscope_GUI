@@ -1,15 +1,38 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+"""
+Microscope GUI
+
+Description:
+    Graphical User Interface (GUI) for controlling a microscope and performing image processing
+    in an SLM-based parallel RESOLFT microscopy system with Adaptive Optics.
+
+Usage:
+    Run this app from the Command Prompt (Conda)
+
+Notes:
+    - The order of package imports in this script is critical and **must not be changed**.
+    - Changing the import order may cause runtime errors or unexpected behavior.
+
+Author: Ruizhe Lin
+Date: 2025-07-21
+"""
+
+
 import os
 import sys
 import time
 
-from PyQt5 import QtWidgets
-
+from miao.widgets import widget_main
 from miao.controllers import controller_main
 from miao.modules import module_main
 from miao.processes import process_main
 from miao.utilities import configurations, error_log
 from miao.utilities import customized_widgets as cw
-from miao.widgets import widget_main
+
+from PyQt5 import QtWidgets
 
 
 class MicroscopeGUI(QtWidgets.QMainWindow):

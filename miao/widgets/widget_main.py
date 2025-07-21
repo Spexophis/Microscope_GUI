@@ -1,10 +1,9 @@
 import os
-import sys
+
+from miao.widgets import widget_ao, widget_con, widget_view
+from miao.utilities import customized_widgets as cw
 
 from PyQt5 import QtWidgets, QtCore
-
-from miao.utilities import customized_widgets as cw
-from miao.widgets import widget_ao, widget_con, widget_view
 
 
 class MainWidget(QtWidgets.QMainWindow):
@@ -118,22 +117,23 @@ class CustomDockTitleBar(QtWidgets.QWidget):
         self.dock_widget.hide()
 
 
-if __name__ == "__main__":
-    from miao.utilities import configurations, error_log
-    import time
-
-    app = QtWidgets.QApplication(sys.argv)
-    cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
-    cfg = configurations.MicroscopeConfiguration(cfd)
-    pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
-    try:
-        os.makedirs(pth, exist_ok=True)
-        print(f'Directory {pth} has been created successfully.')
-    except Exception as e:
-        print(f'Error creating directory {pth}: {e}')
-    log_file = os.path.join(pth, time.strftime("%H%M%S") + 'app.log')
-    lg = error_log.ErrorLog(log_file)
-
-    main_widget = MainWidget(cfg, lg, pth)
-    main_widget.show()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     import sys
+#     from miao.utilities import configurations, error_log
+#     import time
+#
+#     app = QtWidgets.QApplication(sys.argv)
+#     cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
+#     cfg = configurations.MicroscopeConfiguration(cfd)
+#     pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
+#     try:
+#         os.makedirs(pth, exist_ok=True)
+#         print(f'Directory {pth} has been created successfully.')
+#     except Exception as e:
+#         print(f'Error creating directory {pth}: {e}')
+#     log_file = os.path.join(pth, time.strftime("%H%M%S") + 'app.log')
+#     lg = error_log.ErrorLog(log_file)
+#
+#     main_widget = MainWidget(cfg, lg, pth)
+#     main_widget.show()
+#     sys.exit(app.exec_())
