@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 import sys
 import threading
-import time
 from collections import deque
 
 import numpy as np
@@ -88,10 +92,6 @@ class EMCCDCamera:
 
     def close(self):
         self.cooler_off()
-        # self.get_ccd_temperature()
-        # while self.temperature <= 0:
-        #     time.sleep(2)
-        #     self.get_ccd_temperature()
         ret = self.sdk.ShutDown()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.logg.info("Andor EMCCD Shut Down")

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 from PyQt5 import QtWidgets, QtCore
 
 from miao.utilities import customized_widgets as cw
