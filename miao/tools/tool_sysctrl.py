@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 """
 Linear quadratic Gaussian (LQG) control based on Kalman filter
 """

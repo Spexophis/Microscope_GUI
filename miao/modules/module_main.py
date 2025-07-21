@@ -4,6 +4,11 @@ from miao.modules import module_hamamatsuorchflash
 from miao.modules import module_slm_qxga
 from miao.modules import module_coboltlaser
 from miao.modules import module_mcldeck
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 from miao.modules import module_mclpiezo
 from miao.modules import module_nidaq
 from miao.modules import module_tis

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 import numpy as np
 from numpy.fft import fft2, ifft2, fftshift
 from skimage.restoration import unwrap_phase

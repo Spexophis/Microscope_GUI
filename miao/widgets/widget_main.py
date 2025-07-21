@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 import os
 
 from miao.widgets import widget_ao, widget_con, widget_view
