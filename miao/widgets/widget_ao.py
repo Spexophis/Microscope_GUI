@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 from PyQt5 import QtWidgets, QtCore
 
 from miao.utilities import customized_widgets as cw
@@ -98,6 +103,7 @@ class AOWidget(QtWidgets.QWidget):
         self.QSpinBox_spacing_foc = cw.SpinBoxWidget(0, 64, 1, 26)
         self.QSpinBox_radius_foc = cw.SpinBoxWidget(0, 64, 1, 12)
         self.QDoubleSpinBox_foc_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
+
         self.confocal_shwfs_parameters_scroll_area, confocal_shwfs_parameters_scroll_layout = cw.create_scroll_area()
         confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Illumination')))
         confocal_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
@@ -119,43 +125,13 @@ class AOWidget(QtWidgets.QWidget):
         confocal_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
                                                        self.QDoubleSpinBox_foc_background)
 
-        self.QComboBox_wfrmd_img = cw.ComboBoxWidget(list_items=['correlation', 'centerofmass'])
-        self.QSpinBox_base_xcenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_base_ycenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_xcenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_offset_ycenter_img = cw.SpinBoxWidget(0, 2048, 1, 1024)
-        self.QSpinBox_n_lenslets_x_img = cw.SpinBoxWidget(0, 64, 1, 14)
-        self.QSpinBox_n_lenslets_y_img = cw.SpinBoxWidget(0, 64, 1, 14)
-        self.QSpinBox_spacing_img = cw.SpinBoxWidget(0, 64, 1, 26)
-        self.QSpinBox_radius_img = cw.SpinBoxWidget(0, 64, 1, 12)
-        self.QDoubleSpinBox_img_background = cw.DoubleSpinBoxWidget(0, 1, 0.01, 2, 0.1)
-        self.image_shwfs_parameters_scroll_area, image_shwfs_parameters_scroll_layout = cw.create_scroll_area()
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Imaging')))
-        image_shwfs_parameters_scroll_layout.addRow(cw.FrameWidget())
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Method')), self.QComboBox_wfrmd_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Base)')),
-                                                    self.QSpinBox_base_xcenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Base)')),
-                                                    self.QSpinBox_base_ycenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('X_center (Offset)')),
-                                                    self.QSpinBox_offset_xcenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Y_center (Offset)')),
-                                                    self.QSpinBox_offset_ycenter_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet X')), self.QSpinBox_n_lenslets_x_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Lenslet Y')), self.QSpinBox_n_lenslets_y_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Spacing')), self.QSpinBox_spacing_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Radius')), self.QSpinBox_radius_img)
-        image_shwfs_parameters_scroll_layout.addRow(cw.LabelWidget(str('Background')),
-                                                    self.QDoubleSpinBox_img_background)
-
         layout_parameters.addWidget(self.confocal_shwfs_parameters_scroll_area)
-        layout_parameters.addWidget(self.image_shwfs_parameters_scroll_area)
         return layout_parameters
 
     def _create_shwfs_widgets(self):
         layout_shwfs = QtWidgets.QHBoxLayout()
 
-        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "Thorlabs"])
+        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["WebCam", "Thorlabs"])
         self.QPushButton_img_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
         self.QPushButton_run_img_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
         self.QPushButton_run_img_wfr = cw.PushButtonWidget('RunWFR', enable=True)
@@ -293,15 +269,6 @@ class AOWidget(QtWidgets.QWidget):
         self.QPushButton_sensorless_ml_acqs.clicked.connect(self.run_sensorless_ml_acquisition)
 
     def _set_initial_values(self):
-        self.QComboBox_wfs_camera_selection.setCurrentIndex(1)
-        self.QSpinBox_base_xcenter_img.setValue(983)
-        self.QSpinBox_base_ycenter_img.setValue(1081)
-        self.QSpinBox_offset_xcenter_img.setValue(983)
-        self.QSpinBox_offset_ycenter_img.setValue(1081)
-        self.QSpinBox_n_lenslets_x_img.setValue(19)
-        self.QSpinBox_n_lenslets_y_img.setValue(18)
-        self.QSpinBox_spacing_img.setValue(61)
-        self.QSpinBox_radius_img.setValue(24)
         self.load_spinbox_values()
 
     @QtCore.pyqtSlot()

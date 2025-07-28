@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Ruizhe Lin
+# Licensed under the MIT License.
+
+
 import matplotlib
 
 matplotlib.use('Qt5Agg')
@@ -72,8 +77,8 @@ class ViewWidget(QtWidgets.QWidget):
 
     def _set_napari_layers(self):
         self.napari_layers = {}
-        self.img_layers = {0: "Andor EMCCD", 1: "Hamamatsu sCMOS", 2: "Thorlabs CMOS", 3: "DMK 33UX250", 4: "FFT",
-                           5: "ShackHartmann(Base)", 6: "Wavefront", 7: "Array Mask"}
+        self.img_layers = {0: "Thorlabs CMOS", 1: "Thorlabs WebCam",
+                           2: "FFT", 3: "ShackHartmann(Base)", 4: "Wavefront", 5: "Array Mask"}
         for name in reversed(list(self.img_layers.values())):
             self.napari_layers[name] = self.add_napari_layer(name)
 
