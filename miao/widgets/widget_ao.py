@@ -9,13 +9,13 @@ from miao.utilities import customized_widgets as cw
 
 
 class AOWidget(QtWidgets.QWidget):
-    Signal_img_shwfs_base = QtCore.pyqtSignal()
-    Signal_img_wfs = QtCore.pyqtSignal(bool)
-    Signal_img_shwfr_run = QtCore.pyqtSignal()
-    Signal_img_shwfs_compute_wf = QtCore.pyqtSignal()
-    Signal_img_shwfs_correct_wf = QtCore.pyqtSignal(int)
-    Signal_img_shwfs_save_wf = QtCore.pyqtSignal()
-    Signal_img_shwfs_acquisition = QtCore.pyqtSignal()
+    Signal_foc_shwfs_base = QtCore.pyqtSignal()
+    Signal_foc_wfs = QtCore.pyqtSignal(bool)
+    Signal_foc_shwfr_run = QtCore.pyqtSignal()
+    Signal_foc_shwfs_compute_wf = QtCore.pyqtSignal()
+    Signal_foc_shwfs_correct_wf = QtCore.pyqtSignal(int)
+    Signal_foc_shwfs_save_wf = QtCore.pyqtSignal()
+    Signal_foc_shwfs_acquisition = QtCore.pyqtSignal()
     Signal_dm_selection = QtCore.pyqtSignal(str)
     Signal_push_actuator = QtCore.pyqtSignal(int, float)
     Signal_influence_function = QtCore.pyqtSignal()
@@ -78,13 +78,13 @@ class AOWidget(QtWidgets.QWidget):
     def _create_image_widgets(self):
         layout_image = QtWidgets.QHBoxLayout()
 
-        self.lcdNumber_wfmax_img = cw.LCDNumberWidget()
-        self.lcdNumber_wfmin_img = cw.LCDNumberWidget()
-        self.lcdNumber_wfrms_img = cw.LCDNumberWidget()
+        self.lcdNumber_wfmax = cw.LCDNumberWidget()
+        self.lcdNumber_wfmin = cw.LCDNumberWidget()
+        self.lcdNumber_wfrms = cw.LCDNumberWidget()
         self.image_shwfs_scroll_area, image_shwfs_scroll_layout = cw.create_scroll_area()
-        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MAX')), self.lcdNumber_wfmax_img)
-        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MIN')), self.lcdNumber_wfmin_img)
-        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront RMS')), self.lcdNumber_wfrms_img)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MAX')), self.lcdNumber_wfmax)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront MIN')), self.lcdNumber_wfmin)
+        image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Wavefront RMS')), self.lcdNumber_wfrms)
 
         layout_image.addWidget(self.image_shwfs_scroll_area)
         return layout_image
@@ -132,17 +132,17 @@ class AOWidget(QtWidgets.QWidget):
         layout_shwfs = QtWidgets.QHBoxLayout()
 
         self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["WebCam", "Thorlabs"])
-        self.QPushButton_img_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
-        self.QPushButton_run_img_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
-        self.QPushButton_run_img_wfr = cw.PushButtonWidget('RunWFR', enable=True)
-        self.QPushButton_img_shwfs_compute_wf = cw.PushButtonWidget('ComputeWF', enable=True)
-        self.QPushButton_img_shwfs_save_wf = cw.PushButtonWidget('SaveWF', enable=True)
-        self.QPushButton_img_shwfs_acquisition = cw.PushButtonWidget('ACQ')
+        self.QPushButton_foc_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
+        self.QPushButton_run_foc_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
+        self.QPushButton_run_foc_wfr = cw.PushButtonWidget('RunWFR', enable=True)
+        self.QPushButton_foc_shwfs_compute_wf = cw.PushButtonWidget('ComputeWF', enable=True)
+        self.QPushButton_foc_shwfs_save_wf = cw.PushButtonWidget('SaveWF', enable=True)
+        self.QPushButton_foc_shwfs_acquisition = cw.PushButtonWidget('ACQ')
         self.image_shwfs_scroll_area, image_shwfs_scroll_layout = cw.create_scroll_area()
         image_shwfs_scroll_layout.addRow(cw.LabelWidget(str('Camera')), self.QComboBox_wfs_camera_selection)
-        image_shwfs_scroll_layout.addRow(self.QPushButton_run_img_wfs, self.QPushButton_img_shwfs_base)
-        image_shwfs_scroll_layout.addRow(self.QPushButton_run_img_wfr, self.QPushButton_img_shwfs_acquisition)
-        image_shwfs_scroll_layout.addRow(self.QPushButton_img_shwfs_compute_wf, self.QPushButton_img_shwfs_save_wf)
+        image_shwfs_scroll_layout.addRow(self.QPushButton_run_foc_wfs, self.QPushButton_foc_shwfs_base)
+        image_shwfs_scroll_layout.addRow(self.QPushButton_run_foc_wfr, self.QPushButton_foc_shwfs_acquisition)
+        image_shwfs_scroll_layout.addRow(self.QPushButton_foc_shwfs_compute_wf, self.QPushButton_foc_shwfs_save_wf)
 
         layout_shwfs.addWidget(self.image_shwfs_scroll_area)
         return layout_shwfs
@@ -247,12 +247,12 @@ class AOWidget(QtWidgets.QWidget):
         return layout_sensorless
 
     def _set_signal_connections(self):
-        self.QPushButton_img_shwfs_base.clicked.connect(self.img_wfs_base)
-        self.QPushButton_run_img_wfs.clicked.connect(self.run_img_wfs)
-        self.QPushButton_run_img_wfr.clicked.connect(self.run_img_wfr)
-        self.QPushButton_img_shwfs_compute_wf.clicked.connect(self.compute_img_wf)
-        self.QPushButton_img_shwfs_save_wf.clicked.connect(self.save_img_wf)
-        self.QPushButton_img_shwfs_acquisition.clicked.connect(self.wfs_acq)
+        self.QPushButton_foc_shwfs_base.clicked.connect(self.img_wfs_base)
+        self.QPushButton_run_foc_wfs.clicked.connect(self.run_foc_wfs)
+        self.QPushButton_run_foc_wfr.clicked.connect(self.run_foc_wfr)
+        self.QPushButton_foc_shwfs_compute_wf.clicked.connect(self.compute_foc_wf)
+        self.QPushButton_foc_shwfs_save_wf.clicked.connect(self.save_foc_wf)
+        self.QPushButton_foc_shwfs_acquisition.clicked.connect(self.wfs_acq)
         self.QComboBox_dms.currentIndexChanged.connect(self.select_dm)
         self.QPushButton_push_actuator.clicked.connect(self.push_dm_actuator)
         self.QPushButton_influence_fuction_laser.clicked.connect(self.run_influence_function)
@@ -273,30 +273,30 @@ class AOWidget(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def img_wfs_base(self):
-        self.Signal_img_shwfs_base.emit()
+        self.Signal_foc_shwfs_base.emit()
 
     @QtCore.pyqtSlot()
-    def run_img_wfs(self):
-        if self.QPushButton_run_img_wfs.isChecked():
-            self.Signal_img_wfs.emit(True)
+    def run_foc_wfs(self):
+        if self.QPushButton_run_foc_wfs.isChecked():
+            self.Signal_foc_wfs.emit(True)
         else:
-            self.Signal_img_wfs.emit(False)
+            self.Signal_foc_wfs.emit(False)
 
     @QtCore.pyqtSlot()
-    def run_img_wfr(self):
-        self.Signal_img_shwfr_run.emit()
+    def run_foc_wfr(self):
+        self.Signal_foc_shwfr_run.emit()
 
     @QtCore.pyqtSlot()
-    def compute_img_wf(self):
-        self.Signal_img_shwfs_compute_wf.emit()
+    def compute_foc_wf(self):
+        self.Signal_foc_shwfs_compute_wf.emit()
 
     @QtCore.pyqtSlot()
-    def save_img_wf(self):
-        self.Signal_img_shwfs_save_wf.emit()
+    def save_foc_wf(self):
+        self.Signal_foc_shwfs_save_wf.emit()
 
     @QtCore.pyqtSlot()
     def wfs_acq(self):
-        self.Signal_img_shwfs_acquisition.emit()
+        self.Signal_foc_shwfs_acquisition.emit()
 
     @QtCore.pyqtSlot()
     def select_dm(self):
@@ -340,7 +340,7 @@ class AOWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def run_close_loop_correction(self):
         n = self.QSpinBox_close_loop_number.value()
-        self.Signal_img_shwfs_correct_wf.emit(n)
+        self.Signal_foc_shwfs_correct_wf.emit(n)
 
     @QtCore.pyqtSlot()
     def run_sensorless_correction(self):

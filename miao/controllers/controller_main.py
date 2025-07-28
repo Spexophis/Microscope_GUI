@@ -34,7 +34,7 @@ class MainController(QtCore.QObject):
         self._set_signal_connections()
         self._initial_setup()
         self.lasers = []
-        self.cameras = {"imaging": 0, "wfs": 1, "focus_lock": 3}
+        self.cameras = {"imaging": 0, "wfs": 1}
         # dedicated thread pool for tasks
         self.task_worker = None
         self.task_thread = QtCore.QThread()
@@ -81,16 +81,6 @@ class MainController(QtCore.QObject):
         self.sada.connect(self.save_data)
         self.sazf.connect(self.save_zernike_coeffs)
         self.sig_plt.connect(self.plot_)
-        # MCL Piezo
-        self.v.con_view.Signal_piezo_move_usb.connect(self.set_piezo_positions_usb)
-        self.v.con_view.Signal_piezo_move.connect(self.set_piezo_positions)
-        self.v.con_view.Signal_focus_finding.connect(self.run_focus_finding)
-        self.v.con_view.Signal_focus_locking.connect(self.run_focus_locking)
-        # MCL Mad Deck
-        self.v.con_view.Signal_deck_read_position.connect(self.deck_read_position)
-        self.v.con_view.Signal_deck_zero_position.connect(self.deck_zero_position)
-        self.v.con_view.Signal_deck_move_single_step.connect(self.move_deck_single_step)
-        self.v.con_view.Signal_deck_move_continuous.connect(self.move_deck_continuous)
         # Galvo Scanners
         self.v.con_view.Signal_galvo_set.connect(self.set_galvo)
         self.v.con_view.Signal_galvo_scan_update.connect(self.update_galvo_scanner)
@@ -111,8 +101,6 @@ class MainController(QtCore.QObject):
         self.v.con_view.Signal_daq_reset.connect(self.reset_daq_channels)
         # Main Data Recording
         self.v.con_view.Signal_focal_array_scan.connect(self.run_focal_array_scan)
-        self.v.con_view.Signal_grid_pattern_scan.connect(self.run_grid_pattern_scan)
-        self.v.con_view.Signal_alignment.connect(self.run_pattern_alignment)
         self.v.con_view.Signal_data_acquire.connect(self.data_acquisition)
         # DM
         self.v.ao_view.Signal_dm_selection.connect(self.select_dm)
@@ -143,17 +131,12 @@ class MainController(QtCore.QObject):
 
             self.loop_flag = True
 
-            p = self.m.md.get_position_steps_taken(3)
-            self.con_controller.display_deck_position(p)
-
-            self.reset_piezo_positions()
             self.reset_galvo_positions()
             self.update_galvo_scanner()
 
-            self.laser_lists = ["405", "488_0", "488_1", "488_2"]
+            self.laser_lists = ["405", "488"]
 
-            self.pixel_sizes = [0., 0., 0., 0.]
-            self.pixel_sizes[0] = 0.068783
+            self.pixel_sizes = [0., 0.]
 
             self.dm_cmd_ind = {}
             for key in self.m.dm.keys():
@@ -184,120 +167,6 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def interrupt_thread(self):
         self.loop_flag = False
-
-    @QtCore.pyqtSlot()
-    def deck_read_position(self):
-        self.con_controller.display_deck_position(self.m.md.position)
-
-    @QtCore.pyqtSlot()
-    def deck_zero_position(self):
-        self.m.md.position = 0
-        self.con_controller.display_deck_position(self.m.md.position)
-
-    @QtCore.pyqtSlot(bool)
-    def move_deck_single_step(self, direction: bool):
-        if direction:
-            self.move_deck_up()
-        else:
-            self.move_deck_down()
-
-    def move_deck_up(self):
-        try:
-            _moving = self.m.md.is_moving()
-            if _moving:
-                self.logg.info("MadDeck is moving")
-            else:
-                self.m.md.move_relative(3, 0.000762, velocity=0.8)
-                self.con_controller.display_deck_position(self.m.md.position)
-        except Exception as e:
-            self.logg.error(f"MadDeck Error: {e}")
-
-    def move_deck_down(self):
-        try:
-            _moving = self.m.md.is_moving()
-            if _moving:
-                self.logg.info("MadDeck is moving")
-            else:
-                self.m.md.move_relative(3, -0.000762, velocity=0.8)
-                self.con_controller.display_deck_position(self.m.md.position)
-        except Exception as e:
-            self.logg.error(f"MadDeck Error: {e}")
-
-    @QtCore.pyqtSlot(bool, int, float)
-    def move_deck_continuous(self, moving: bool, direction: int, velocity: float):
-        if moving:
-            self.m.md.move_deck(direction, velocity)
-        else:
-            self.m.md.stop_deck()
-
-    def reset_piezo_positions(self):
-        pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
-        self.set_piezo_position_x(pos_x[0], port="software")
-        self.set_piezo_position_y(pos_y[0], port="software")
-        self.set_piezo_position_z(pos_z[0], port="software")
-        self.set_piezo_position_x(pos_x[1], port="analog")
-        self.set_piezo_position_y(pos_y[1], port="analog")
-        self.set_piezo_position_z(pos_z[1], port="analog")
-        self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
-        self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
-        self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
-
-    @QtCore.pyqtSlot(str, float, float, float)
-    def set_piezo_positions_usb(self, axis: str, value_x: float, value_y: float, value_z: float):
-        if axis == "x":
-            self.set_piezo_position_x(value_x, port="software")
-        if axis == "y":
-            self.set_piezo_position_y(value_y, port="software")
-        if axis == "z":
-            self.set_piezo_position_z(value_z, port="software")
-
-    @QtCore.pyqtSlot(str, float, float, float)
-    def set_piezo_positions(self, axis: str, value_x: float, value_y: float, value_z: float):
-        if axis == "x":
-            self.set_piezo_position_x(value_x, port="analog")
-        if axis == "y":
-            self.set_piezo_position_y(value_y, port="analog")
-        if axis == "z":
-            self.set_piezo_position_z(value_z, port="analog")
-
-    def set_piezo_position_x(self, pos_x, port="analog"):
-        try:
-            if port == "software":
-                self.m.pz.move_position(0, pos_x)
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
-            else:
-                self.m.daq.set_piezo_position([pos_x / 10.], [0])
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
-        except Exception as e:
-            self.logg.error(f"MCL Piezo Error: {e}")
-
-    def set_piezo_position_y(self, pos_y, port="analog"):
-        try:
-            if port == "software":
-                self.m.pz.move_position(1, pos_y)
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
-            else:
-                self.m.daq.set_piezo_position([pos_y / 10.], [1])
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
-        except Exception as e:
-            self.logg.error(f"MCL Piezo Error: {e}")
-
-    def set_piezo_position_z(self, pos_z, port="analog"):
-        try:
-            if port == "software":
-                self.m.pz.move_position(2, pos_z)
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
-            else:
-                self.m.daq.set_piezo_position([pos_z / 10.], [2])
-                time.sleep(0.1)
-                self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
-        except Exception as e:
-            self.logg.error(f"MCL Piezo Error: {e}")
 
     def reset_galvo_positions(self):
         g_x, g_y = self.con_controller.get_galvo_positions()
@@ -354,53 +223,14 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Cobolt Laser Error: {e}")
 
-    @QtCore.pyqtSlot()
-    def check_emdccd_temperature(self):
-        try:
-            self.m.ccdcam.get_ccd_temperature()
-            self.con_controller.display_camera_temperature(self.m.ccdcam.temperature)
-        except Exception as e:
-            self.logg.error(f"CCD Camera Error: {e}")
-
-    @QtCore.pyqtSlot(bool)
-    def switch_emdccd_cooler(self, sw: bool):
-        if sw:
-            self.switch_emdccd_cooler_on()
-        else:
-            self.switch_emdccd_cooler_off()
-
-    def switch_emdccd_cooler_on(self):
-        try:
-            self.m.ccdcam.cooler_on()
-        except Exception as e:
-            self.logg.error(f"CCD Camera Error: {e}")
-
-    def switch_emdccd_cooler_off(self):
-        try:
-            self.m.ccdcam.cooler_off()
-        except Exception as e:
-            self.logg.error(f"CCD Camera Error: {e}")
-
     def set_camera_roi(self, key="imaging"):
         try:
             if self.cameras[key] == 0:
-                x, y, nx, ny, bx, by = self.con_controller.get_emccd_roi()
-                self.m.cam_set[0].bin_h, self.m.cam_set[0].bin_v = bx, by
-                self.m.cam_set[0].start_h, self.m.cam_set[0].end_h = x, x + nx - 1
-                self.m.cam_set[0].start_v, self.m.cam_set[0].end_v = y, y + ny - 1
-                self.m.cam_set[0].gain = self.con_controller.get_emccd_gain()
-                self.m.cam_set[0].t_exposure = self.con_controller.get_emccd_expo()
-            if self.cameras[key] == 1:
-                x, y, nx, ny, bx, by = self.con_controller.get_scmos_roi()
-                self.m.cam_set[1].set_roi(bx, by, x, nx, y, ny)
-            if self.cameras[key] == 2:
                 x, y, nx, ny, bx, by = self.con_controller.get_thorcam_roi()
-                self.m.cam_set[2].set_roi(x, y, x + nx - 1, y + ny - 1)
-            if self.cameras[key] == 3:
-                expo = self.con_controller.get_tis_expo()
-                self.m.cam_set[3].set_exposure(expo)
-                x, y, nx, ny, bx, by = self.con_controller.get_tis_roi()
-                self.m.cam_set[3].set_roi(x, y, nx, ny)
+                self.m.cam_set[self.cameras[key]].set_roi(x, y, x + nx - 1, y + ny - 1)
+            if self.cameras[key] == 1:
+                x, y, nx, ny, bx, by = self.con_controller.get_webcam_roi()
+                self.m.cam_set[self.cameras[key]].set_roi(x, y, nx, ny)
         except Exception as e:
             self.logg.error(f"Camera Error: {e}")
 
@@ -416,11 +246,11 @@ class MainController(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
-        galvo_positions, galvo_ranges, dot_pos, offset, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act, sws = self.con_controller.get_galvo_scan_parameters()
+        galvo_positions, galvo_ranges, dot_pos, offset, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act = self.con_controller.get_galvo_scan_parameters()
         self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges,
                                                     foci=dot_pos, offsets=offset,
                                                     origins_act=galvo_positions_act, ranges_act=galvo_ranges_act,
-                                                    foci_act=dot_pos_act, offsets_act=offset_act, sws=sws)
+                                                    foci_act=dot_pos_act, offsets_act=offset_act)
         self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
 
     def update_trigger_parameters(self, cam_key):
@@ -641,10 +471,6 @@ class MainController(QtCore.QObject):
     def data_acquisition(self, acq_mod: str, acq_num: int):
         if acq_mod == "Wide Field 2D":
             self.run_widefield_zstack(acq_num)
-        elif acq_mod == "Wide Field 3D":
-            self.run_widefield_zstack(acq_num)
-        elif acq_mod == "Monalisa Scan 2D":
-            self.run_monalisa_scan(acq_num)
         elif acq_mod == "Dot Scan 2D":
             self.run_dot_scan(acq_num)
         elif acq_mod == "Point Scan 2D":
@@ -669,133 +495,6 @@ class MainController(QtCore.QObject):
                 for i, arr in enumerate(pos):
                     df_pos = pd.DataFrame(arr, columns=[f"axis_{i}"])
                     df_pos.to_excel(writer, sheet_name=f"axis_{i}", index=False)
-
-    def prepare_focus_finding(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        dtr, sw, dch = self.generate_live_triggers("imaging")
-        self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-        self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
-        self.m.cam_set[self.cameras["focus_lock"]].set_exposure(self.con_controller.get_tis_expo())
-        self.m.cam_set[self.cameras["focus_lock"]].prepare_live()
-
-    def focus_finding(self):
-        try:
-            self.prepare_focus_finding()
-        except Exception as e:
-            self.logg.error(f"Error starting focus finding: {e}")
-            return
-        try:
-            pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
-            center_pos, axis_length, step_size = pos_z[0], 0.8, 0.08
-            start = center_pos - axis_length
-            end = center_pos + axis_length
-            zps = np.arange(start, end + step_size, step_size)
-            data = []
-            data_calib = []
-            pzs = []
-            self.m.cam_set[self.cameras["imaging"]].start_live()
-            self.m.cam_set[self.cameras["focus_lock"]].start_live()
-            for i, z in enumerate(zps):
-                self.set_piezo_position_z(z, port="software")
-                time.sleep(0.1)
-                self.m.daq.run_triggers()
-                time.sleep(0.04)
-                temp = self.m.cam_set[self.cameras["imaging"]].get_last_image()
-                data.append(temp)
-                self.m.daq.stop_triggers(_close=False)
-                data_calib.append(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
-                pzs.append(ipr.calculate_focus_measure_with_sobel(temp - temp.min()))
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack.tif')
-            tf.imwrite(fd, np.asarray(data), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um',
-                                 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
-            self.view_controller.plot_update(pzs, x=zps)
-            fp = ipr.peak_find(zps, pzs)
-            self.v.con_view.QDoubleSpinBox_stage_z_usb.setValue(fp)
-            time.sleep(0.06)
-            data_calib.append(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_focus_calibration_stack.tif')
-            tf.imwrite(fd, np.asarray(data_calib), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["focus_lock"]], 1 / self.pixel_sizes[self.cameras["focus_lock"]]),
-                       metadata={'unit': 'um'})
-            self.p.foc_ctrl.calibrate(np.append(zps, fp), np.asarray(data_calib))
-        except Exception as e:
-            self.finish_focus_finding()
-            self.logg.error(f"Error running focus finding: {e}")
-            return
-        self.finish_focus_finding()
-
-    def finish_focus_finding(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.m.cam_set[self.cameras["focus_lock"]].stop_live()
-            self.lasers_off()
-            self.m.daq.stop_triggers()
-            self.reset_piezo_positions()
-            self.logg.info("Focus finding stack acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping focus finding: {e}")
-
-    @QtCore.pyqtSlot()
-    def run_focus_finding(self):
-        self.v.get_dialog()
-        self.run_task(task=self.focus_finding)
-
-    def prepare_focus_locking(self):
-        p = self.con_controller.get_pid_parameters()
-        self.p.foc_ctrl.update_pid(p)
-        z = self.v.con_view.QDoubleSpinBox_stage_z_usb.value()
-        self.p.foc_ctrl.initiate(z)
-        self.m.cam_set[self.cameras["focus_lock"]].set_exposure(self.con_controller.get_tis_expo())
-        self.m.cam_set[self.cameras["focus_lock"]].prepare_live()
-        self.m.cam_set[self.cameras["focus_lock"]].start_live()
-        time.sleep(0.1)
-        self.p.foc_ctrl.set_focus(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
-        self.m.cam_set[self.cameras["focus_lock"]].stop_live()
-
-    def lock_focus(self):
-        try:
-            self.prepare_focus_locking()
-        except Exception as e:
-            self.logg.error(f"Error preparing focus locking: {e}")
-            self.release_focus()
-            return
-        try:
-            self.m.cam_set[self.cameras["focus_lock"]].start_live()
-            self.thread_floc.start()
-        except Exception as e:
-            self.logg.error(f"Error starting focus locking: {e}")
-            self.release_focus()
-            return
-
-    def release_focus(self):
-        try:
-            if self.thread_floc.isRunning():
-                self.thread_floc.quit()
-                self.thread_floc.wait()
-            self.m.cam_set[self.cameras["focus_lock"]].stop_live()
-        except Exception as e:
-            self.logg.error(f"Error stopping imaging video: {e}")
-
-    def focus_locking(self):
-        self.p.foc_ctrl.update(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
-        self.v.con_view.QDoubleSpinBox_stage_z_usb.setValue(self.p.foc_ctrl.ctd.data_list[-1])
-        self.view_controller.plot_update(self.p.foc_ctrl.ctd.data_list, s=self.p.foc_ctrl.pid.set_point)
-
-    @QtCore.pyqtSlot(bool)
-    def run_focus_locking(self, sw: bool):
-        if sw:
-            self.lock_focus()
-        else:
-            self.release_focus()
 
     def prepare_widefield_zstack(self):
         self.lasers = self.con_controller.get_lasers()
@@ -847,57 +546,6 @@ class MainController(QtCore.QObject):
     def run_widefield_zstack(self, n: int):
         self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
-
-    def prepare_monalisa_scan_2d(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
-        self.m.daq.set_piezo_position(pos=list(np.swapaxes(ptr, 0, 1)[0]), indices=pch)
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
-
-    def monalisa_scan_2d(self):
-        try:
-            self.prepare_monalisa_scan_2d()
-        except Exception as e:
-            self.logg.error(f"Error preparing monalisa scanning: {e}")
-            return
-        try:
-            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-            time.sleep(0.02)
-            self.m.daq.run_triggers()
-            time.sleep(1.)
-            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_monalisa_scanning',
-                           self.m.cam_set[self.cameras["imaging"]].get_data(),
-                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
-                           self.p.trigger.piezo_scan_positions)
-        except Exception as e:
-            self.finish_monalisa_scan()
-            self.logg.error(f"Error running monalisa scanning: {e}")
-            return
-        self.finish_monalisa_scan()
-
-    def finish_monalisa_scan(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
-            self.m.daq.stop_triggers()
-            self.lasers_off()
-            self.reset_piezo_positions()
-            self.logg.info("Monalisa scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping monalisa scanning: {e}")
-
-    def run_monalisa_scan(self, n: int):
-        self.v.get_dialog()
-        self.run_task(task=self.monalisa_scan_2d, iteration=n)
 
     def prepare_point_scan(self):
         self.lasers = self.con_controller.get_lasers()
@@ -1004,69 +652,6 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.dot_scan, iteration=n)
 
-    def pattern_alignment(self):
-        ax = self.con_controller.get_profile_axis()
-
-        try:
-            # grid pattern
-            self.lasers = [1]
-            self.set_lasers(self.lasers)
-            self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-            self.set_camera_roi("imaging")
-            self.m.cam_set[self.cameras["imaging"]].prepare_live()
-            self.update_trigger_parameters("imaging")
-            self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-            dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
-            self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=True)
-            self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.1)
-            data = []
-            for i in range(10):
-                self.m.daq.run_triggers()
-                time.sleep(0.08)
-                data.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
-                self.m.daq.stop_triggers(_close=False)
-            self.m.daq.stop_triggers()
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.view_controller.plot_update(ipr.get_profile(np.average(np.asarray(data), axis=0), ax, norm=True))
-            # dot array
-            self.lasers = [3]
-            self.set_lasers(self.lasers)
-            self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-            self.set_camera_roi("imaging")
-            self.m.cam_set[self.cameras["imaging"]].prepare_live()
-            self.update_trigger_parameters("imaging")
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
-            self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                      digital_sequences=dtr, digital_channels=chs, finite=True)
-            self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.1)
-            data = []
-            for i in range(10):
-                self.m.daq.run_triggers()
-                time.sleep(0.08)
-                data.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
-                self.m.daq.stop_triggers(_close=False)
-            self.view_controller.plot(ipr.get_profile(np.average(np.asarray(data), axis=0), ax, norm=True))
-        except Exception as e:
-            self.finish_pattern_alignment()
-            self.logg.error(f"Error running pattern alignment: {e}")
-            return
-        self.finish_pattern_alignment()
-
-    def finish_pattern_alignment(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.m.daq.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Pattern alignment finished")
-        except Exception as e:
-            self.logg.error(f"Error stopping pattern alignment: {e}")
-
-    def run_pattern_alignment(self):
-        self.v.get_dialog()
-        self.run_task(task=self.pattern_alignment)
-
     def prepare_focal_array_scan(self):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
@@ -1133,79 +718,6 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.focal_array_scan)
 
-    def prepare_grid_pattern_scan(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        self.update_trigger_parameters("imaging")
-        dtr, sw, dch = self.generate_live_triggers("imaging")
-        self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
-
-    def grid_pattern_scan(self):
-        try:
-            self.prepare_grid_pattern_scan()
-        except Exception as e:
-            self.logg.error(f"Error preparing grid pattern scanning: {e}")
-            return
-        try:
-            pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
-            positions = [pos_x[1], pos_y[1], pos_z[1]]
-            axis_lengths, step_sizes = self.con_controller.get_piezo_scan_parameters()
-            starts = [position - 0.5 * axis_length for position, axis_length in zip(positions, axis_lengths)]
-            ends = [position + 0.5 * axis_length for position, axis_length in zip(positions, axis_lengths)]
-            scans = [np.arange(start / 10, end / 10 + step_size / 10, step_size / 10) for start, end, step_size in
-                     zip(starts, ends, step_sizes)]
-            self.m.daq.set_piezo_position([scans[0][0], scans[1][0]], [0, 1])
-            # grid pattern minima
-            data = []
-            sx, sy = scans[0].shape[0], scans[1].shape[0]
-            mx = np.zeros((sy, sx))
-            self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.2)
-            for j in range(sy):
-                self.m.daq.set_piezo_position([scans[1][j]], [1])
-                for i in range(sx):
-                    self.m.daq.set_piezo_position([scans[0][i]], [0])
-                    time.sleep(0.08)
-                    self.m.daq.run_triggers()
-                    time.sleep(0.04)
-                    temp = self.m.cam_set[self.cameras["imaging"]].get_last_image()
-                    self.m.daq.stop_triggers(_close=False)
-                    data.append(temp)
-                    mx[j, i] = np.mean(temp)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_grid_pattern_scan.tif')
-            tf.imwrite(fd, np.asarray(data), imagej=True,
-                       resolution=(1 / self.pixel_sizes[self.cameras["imaging"]],
-                                   1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um'})
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_grid_pattern_scan_recon.tif')
-            tf.imwrite(fd, mx)
-            self.v.view_view.plot_image(data=mx, axis_arrays=scans, axis_labels=None)
-        except Exception as e:
-            self.finish_grid_pattern_scan()
-            self.logg.error(f"Error running grid pattern scanning: {e}")
-            return
-        self.finish_grid_pattern_scan()
-
-    def finish_grid_pattern_scan(self):
-        try:
-            # self.m.pz.release_lock()
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.m.daq.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Grid pattern scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping grid pattern scanning: {e}")
-
-    def run_grid_pattern_scan(self):
-        self.v.get_dialog()
-        self.run_task(task=self.grid_pattern_scan)
-
     @QtCore.pyqtSlot(str)
     def select_dm(self, dm_n):
         self.dfm = self.m.dm[dm_n]
@@ -1224,7 +736,7 @@ class MainController(QtCore.QObject):
 
     def set_zernike(self, factory=False):
         try:
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             indz, amp = self.ao_controller.get_zernike_mode()
             if factory:
                 self.dfm.set_dm(
@@ -1281,18 +793,11 @@ class MainController(QtCore.QObject):
             self.logg.error(f"DM Error: {e}")
 
     def set_img_wfs(self, idx):
-        if idx == 1:
-            parameters = self.ao_controller.get_parameters_img()
-            self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
-            self.p.shwfsr.update_parameters(parameters)
-            self.logg.info('SHWFS parameter updated')
-        elif idx == 2:
-            parameters = self.ao_controller.get_parameters_foc()
-            self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
-            self.p.shwfsr.update_parameters(parameters)
-            self.logg.info('SHWFS parameter updated')
-        else:
-            raise ValueError("Invalid wfs index")
+        parameters = self.ao_controller.get_parameters_foc()
+        self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
+        self.p.shwfsr.update_parameters(parameters)
+        self.logg.info('SHWFS parameter updated')
+
 
     def prepare_img_wfs(self):
         self.lasers = self.con_controller.get_lasers()
@@ -1362,7 +867,7 @@ class MainController(QtCore.QObject):
 
     def img_wfr(self):
         try:
-            self.p.shwfsr.method = self.ao_controller.get_gradient_method_img()
+            self.p.shwfsr.method = self.ao_controller.get_gradient_method()
             self.p.shwfsr.wavefront_reconstruction()
         except Exception as e:
             self.logg.error(f"SHWFS Reconstruction Error: {e}")
@@ -1380,7 +885,7 @@ class MainController(QtCore.QObject):
         self.run_task(task=self.compute_img_wf)
 
     def compute_img_wf(self):
-        md = self.ao_controller.get_gradient_method_img()
+        md = self.ao_controller.get_gradient_method()
         gradx, grady = self.p.shwfsr.get_gradient_xy(mtd=md)
         a = self.dfm.get_zernike_coffs(gradx, grady)
         self.view_controller.plot_update(a, x=np.asarray(tz.modes))
@@ -1515,7 +1020,7 @@ class MainController(QtCore.QObject):
             time.sleep(0.08)
             self.p.shwfsr.meas = self.m.cam_set[self.cameras["wfs"]].get_last_image()
             self.m.daq.stop_triggers(_close=False)
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             self.dfm.get_correction(self.p.shwfsr.get_gradient_xy(), method="modal")
             self.dfm.set_dm(self.dfm.dm_cmd[-1])
             self.ao_controller.update_cmd_index()
@@ -1617,7 +1122,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             amprange = [amp_start + step_number * amp_step for step_number in range(amp_step_number)]
             results = [('Mode', 'Amp', 'Metric')]
             za = []
@@ -1746,7 +1251,7 @@ class MainController(QtCore.QObject):
         try:
             t = time.strftime("%Y%m%d%H%M_")
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             amprange = np.linspace(amp_start, -amp_start, amp_step_number + 1)
             cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
             self.m.cam_set[self.cameras["imaging"]].start_live()
@@ -1805,7 +1310,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             self.m.cam_set[self.cameras["imaging"]].start_live()
             self.dfm.set_dm(self.dfm.dm_cmd[self.dfm.current_cmd])
             self.logg.info("Automated sensorless AO iterations start")
@@ -1852,7 +1357,7 @@ class MainController(QtCore.QObject):
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
-            md = self.ao_controller.get_img_wfs_method()
+            md = self.ao_controller.get_wfs_method()
             za = []
             mv = []
             zp = [0] * self.dfm.n_zernike
@@ -1949,7 +1454,7 @@ class MainController(QtCore.QObject):
             self.finish_shwfs_acquisition()
             return
         try:
-            mtd = self.ao_controller.get_img_wfs_method()
+            mtd = self.ao_controller.get_wfs_method()
             modes = np.arange(16)
             self.m.cam_set[self.cameras["wfs"]].start_live()
             time.sleep(0.02)
@@ -1976,7 +1481,7 @@ class MainController(QtCore.QObject):
                 self.m.daq.stop_triggers(_close=False)
                 self.p.shwfsr.ref = data[0]
                 self.p.shwfsr.meas = data[1]
-                md = self.ao_controller.get_gradient_method_img()
+                md = self.ao_controller.get_gradient_method()
                 gradx, grady = self.p.shwfsr.get_gradient_xy(mtd=md)
                 amps[:, 1] = self.dfm.get_zernike_coffs(gradx, grady)
                 t = time.strftime("%Y%m%d_%H%M%S_")

@@ -9,16 +9,16 @@ class ViewController:
     def plot_sh(self, data, layer=1):
         self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_msk(self, data, layer=7):
+    def plot_fft(self, data, layer=2):
         self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_fft(self, data, layer=4):
+    def plot_shb(self, data, layer=3):
         self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_shb(self, data, layer=5):
+    def plot_wf(self, data, layer=4):
         self.v.show_image(self.v.img_layers[layer], data)
 
-    def plot_wf(self, data, layer=6):
+    def plot_msk(self, data, layer=5):
         self.v.show_image(self.v.img_layers[layer], data)
 
     def get_image_data(self, layer=1):
