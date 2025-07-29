@@ -128,7 +128,7 @@ if __name__ == "__main__":
     import time
 
     app = QtWidgets.QApplication(sys.argv)
-    cfd = r"C:\\Users\\Public\\Documents\\Data\\config_files\\microscope_configurations__polarization_scan.json"
+    cfd = r"C:\\Users\\Public\\Documents\\Data\\config_files\\microscope_configurations_polarization_scan.json"
     cfg = configurations.MicroscopeConfiguration(cfd)
     pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
     try:
