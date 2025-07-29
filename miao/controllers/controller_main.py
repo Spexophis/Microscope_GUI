@@ -88,22 +88,19 @@ class MainController(QtCore.QObject):
         # Cobolt Lasers
         self.v.con_view.Signal_set_laser.connect(self.set_laser)
         # Main Image Control
-        self.v.con_view.Signal_check_emccd_temperature.connect(self.check_emdccd_temperature)
-        self.v.con_view.Signal_switch_emccd_cooler.connect(self.switch_emdccd_cooler)
         self.v.con_view.Signal_plot_trigger.connect(self.plot_trigger)
         self.v.con_view.Signal_video.connect(self.video)
         self.v.con_view.Signal_fft.connect(self.fft)
         self.v.con_view.Signal_plot_profile.connect(self.plot_live)
         self.v.con_view.Signal_add_profile.connect(self.plot_add)
         self.v.con_view.Signal_set_mask.connect(self.set_array_mask)
-        # NIDAQ
-        self.v.con_view.Signal_daq_update.connect(self.update_daq_sample_rate)
-        self.v.con_view.Signal_daq_reset.connect(self.reset_daq_channels)
+        # NUCLEO
+        self.v.con_view.Signal_nucleo_update.connect(self.update_nucleo)
+        self.v.con_view.Signal_nucleo_reset.connect(self.reset_nucleo)
         # Main Data Recording
         self.v.con_view.Signal_focal_array_scan.connect(self.run_focal_array_scan)
         self.v.con_view.Signal_data_acquire.connect(self.data_acquisition)
         # DM
-        self.v.ao_view.Signal_dm_selection.connect(self.select_dm)
         self.v.ao_view.Signal_push_actuator.connect(self.push_actuator)
         self.v.ao_view.Signal_set_zernike.connect(self.set_zernike)
         self.v.ao_view.Signal_set_dm.connect(self.set_dm)
@@ -138,11 +135,12 @@ class MainController(QtCore.QObject):
 
             self.pixel_sizes = [0., 0.]
 
-            self.dm_cmd_ind = {}
-            for key in self.m.dm.keys():
-                self.v.ao_view.QComboBox_dms.addItem(key)
-                self.dm_cmd_ind[key] = self.m.dm[key].current_cmd
-            self.dfm = self.m.dm[self.v.ao_view.QComboBox_dms.currentText()]
+            self.dm_cmd_ind = self.m.dm.current_cmd
+            self.dfm = self.m.dm
+            self.v.ao_view.QComboBox_cmd.clear()
+            self.v.ao_view.QComboBox_cmd.addItems([str(i) for i in range(len(self.dfm.dm_cmd))])
+            self.v.ao_view.QComboBox_cmd.setCurrentIndex(self.dfm.current_cmd)
+
             self.logg.info("Finish setting up controllers")
         except Exception as e:
             self.logg.error(f"Initial setup Error: {e}")
@@ -234,14 +232,14 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Camera Error: {e}")
 
-    @QtCore.pyqtSlot(int)
-    def update_daq_sample_rate(self, sr: int):
+    @QtCore.pyqtSlot()
+    def update_nucleo(self):
         self.p.trigger.update_nidaq_parameters(sr * 1000)
         self.update_galvo_scanner()
         self.m.daq.sample_rate = sr * 1000
 
     @QtCore.pyqtSlot()
-    def reset_daq_channels(self):
+    def reset_nucleo(self):
         self.m.daq.stop_triggers()
 
     @QtCore.pyqtSlot()
@@ -259,16 +257,6 @@ class MainController(QtCore.QObject):
             digital_starts, digital_ends = self.con_controller.get_digital_parameters()
             self.p.trigger.update_digital_parameters(digital_starts, digital_ends)
             self.update_galvo_scanner()
-            axis_lengths, step_sizes = self.con_controller.get_piezo_scan_parameters()
-            pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
-            positions = [pos_x[1], pos_y[1], pos_z[1]]
-            return_time = self.con_controller.get_piezo_return_time()
-            self.p.trigger.update_piezo_scan_parameters(axis_lengths, step_sizes, positions, return_time)
-            self.p.trigger.update_camera_parameters(initial_time=self.m.cam_set[self.cameras[cam_key]].t_clean,
-                                                    standby_time=self.m.cam_set[self.cameras[cam_key]].t_readout,
-                                                    cycle_time=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
-            if self.cameras[cam_key] == 0:
-                self.con_controller.display_camera_timings(standby=self.m.cam_set[self.cameras[cam_key]].t_kinetic)
             self.logg.info(f"Trigger Updated")
         except Exception as e:
             self.logg.error(f"Trigger Error: {e}")
@@ -282,54 +270,15 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
-        if self.cameras["imaging"] == 0:
-            self.m.cam_set[self.cameras["imaging"]].prepare_live()
-            self.update_trigger_parameters("imaging")
-        if self.cameras["imaging"] == 1:
-            self.m.cam_set[self.cameras["imaging"]].mode = self.con_controller.get_scmos_mode()
-            if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
-                self.update_trigger_parameters("imaging")
-                _, _, interval_lines = self.con_controller.get_scmos_expo()
-                line_exposure, line_interval = self.p.trigger.update_lightsheet_rolling(interval_lines)
-                self.m.cam_set[self.cameras["imaging"]].line_exposure = line_exposure
-                self.m.cam_set[self.cameras["imaging"]].line_interval = line_interval
-                self.con_controller.display_cmos_rolling_timings(line_exposure, line_interval)
-                self.m.cam_set[self.cameras["imaging"]].prepare_live()
-            if self.m.cam_set[self.cameras["imaging"]].mode == "Normal":
-                self.m.cam_set[self.cameras["imaging"]].prepare_live()
-                self.update_trigger_parameters("imaging")
+        self.m.cam_set[self.cameras["imaging"]].prepare_live()
+        self.update_trigger_parameters("imaging")
         if vd_mod == "Wide Field":
-            self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
             self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                       clean=self.p.trigger.initial_time,
-                                                       standby=self.p.trigger.standby_time)
         if vd_mod == "Dot Scan":
-            if self.cameras["imaging"] == 1:
-                if self.m.cam_set[self.cameras["imaging"]].mode == "LightSheet":
-                    self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-                    dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers_rolling(self.lasers,
-                                                                                              self.cameras["imaging"])
-                    self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                              digital_sequences=dtr, digital_channels=chs, finite=False)
-                else:
-                    dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers,
-                                                                                      self.cameras["imaging"])
-                    self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                              digital_sequences=dtr, digital_channels=chs, finite=False)
-            else:
-                dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
-                self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                          digital_sequences=dtr, digital_channels=chs, finite=False)
-                self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                           clean=self.p.trigger.initial_time,
-                                                           standby=self.p.trigger.standby_time)
-        if vd_mod == "Scan Calib":
-            self.set_switch(self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
-            dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
-            self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                      digital_sequences=dtr, digital_channels=dch, finite=False)
+            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
+            self.m.daq.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
+                                      digital_sequences=dtr, digital_channels=chs, finite=False)
         if vd_mod == "Focus Lock":
             self.logg.info(f"Focus Lock live")
 
@@ -361,8 +310,6 @@ class MainController(QtCore.QObject):
             self.lasers_off()
             if vm == "Dot Scan":
                 self.reset_galvo_positions()
-            elif vm == "Scan Calib":
-                self.reset_piezo_positions()
         except Exception as e:
             self.logg.error(f"Error stopping imaging video: {e}")
 
@@ -470,7 +417,7 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot(str, int)
     def data_acquisition(self, acq_mod: str, acq_num: int):
         if acq_mod == "Wide Field 2D":
-            self.run_widefield_zstack(acq_num)
+            self.run_widefield(acq_num)
         elif acq_mod == "Dot Scan 2D":
             self.run_dot_scan(acq_num)
         elif acq_mod == "Point Scan 2D":
@@ -496,7 +443,7 @@ class MainController(QtCore.QObject):
                     df_pos = pd.DataFrame(arr, columns=[f"axis_{i}"])
                     df_pos.to_excel(writer, sheet_name=f"axis_{i}", index=False)
 
-    def prepare_widefield_zstack(self):
+    def prepare_widefield(self):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
@@ -509,13 +456,10 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
                                   finite=True)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
 
-    def widefield_zstack(self):
+    def widefield(self):
         try:
-            self.prepare_widefield_zstack()
+            self.prepare_widefield()
         except Exception as e:
             self.logg.error(f"Error preparing widefield zstack: {e}")
             return
@@ -528,24 +472,23 @@ class MainController(QtCore.QObject):
                            list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
                            self.p.trigger.piezo_scan_positions)
         except Exception as e:
-            self.finish_widefield_zstack()
+            self.finish_widefield()
             self.logg.error(f"Error running widefield zstack: {e}")
             return
-        self.finish_widefield_zstack()
+        self.finish_widefield()
 
-    def finish_widefield_zstack(self):
+    def finish_widefield(self):
         try:
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.lasers_off()
             self.m.daq.stop_triggers()
-            self.reset_piezo_positions()
             self.logg.info("Widefield image stack acquired")
         except Exception as e:
             self.logg.error(f"Error stopping widefield zstack: {e}")
 
-    def run_widefield_zstack(self, n: int):
+    def run_widefield(self, n: int):
         self.v.get_dialog()
-        self.run_task(task=self.widefield_zstack, iteration=n)
+        self.run_task(task=self.widefield, iteration=n)
 
     def prepare_point_scan(self):
         self.lasers = self.con_controller.get_lasers()
@@ -559,9 +502,6 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].acq_num = pos
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
                                   digital_sequences=dtr, digital_channels=dch)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
 
     def point_scan(self):
         try:
@@ -579,17 +519,16 @@ class MainController(QtCore.QObject):
                 1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
                        metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
         except Exception as e:
-            self.finish_monalisa_scan()
+            self.finish_point_scan()
             self.logg.error(f"Error running point scanning: {e}")
             return
-        self.finish_monalisa_scan()
+        self.finish_point_scan()
 
     def finish_point_scan(self):
         try:
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
-            self.reset_piezo_positions()
             self.logg.info("Point scanning image acquired")
         except Exception as e:
             self.logg.error(f"Error stopping point scanning: {e}")
@@ -610,9 +549,6 @@ class MainController(QtCore.QObject):
         self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
                                   galvo_sequences=gtr, galvo_channels=[0, 1, 2],
                                   digital_sequences=dtr, digital_channels=chs)
-        self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                   clean=self.p.trigger.initial_time,
-                                                   standby=self.p.trigger.standby_time)
 
     def dot_scan(self):
         try:
@@ -626,8 +562,7 @@ class MainController(QtCore.QObject):
             self.m.daq.run_triggers()
             time.sleep(1.)
             fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_dot_scanning.tif')
-            for key in self.dm_cmd_ind.keys():
-                self.dm_cmd_ind[key] = self.m.dm[key].current_cmd
+            self.dm_cmd_ind = self.m.dm.current_cmd
             tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
                 1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
                        metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
@@ -643,7 +578,6 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.m.daq.stop_triggers()
             self.lasers_off()
-            self.reset_piezo_positions()
             self.logg.info("Dot scanning image acquired")
         except Exception as e:
             self.logg.error(f"Error stopping dot scanning: {e}")
@@ -718,13 +652,6 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.focal_array_scan)
 
-    @QtCore.pyqtSlot(str)
-    def select_dm(self, dm_n):
-        self.dfm = self.m.dm[dm_n]
-        self.v.ao_view.QComboBox_cmd.clear()
-        self.v.ao_view.QComboBox_cmd.addItems([str(i) for i in range(len(self.dfm.dm_cmd))])
-        self.v.ao_view.QComboBox_cmd.setCurrentIndex(self.dfm.current_cmd)
-
     @QtCore.pyqtSlot(int, float)
     def push_actuator(self, n: int, a: float):
         try:
@@ -797,7 +724,6 @@ class MainController(QtCore.QObject):
         self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
         self.p.shwfsr.update_parameters(parameters)
         self.logg.info('SHWFS parameter updated')
-
 
     def prepare_img_wfs(self):
         self.lasers = self.con_controller.get_lasers()
