@@ -84,6 +84,7 @@ class MainWidget(QtWidgets.QMainWindow):
                 return os.path.basename(selected_file[0])
             else:
                 return None
+        return None
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
@@ -122,23 +123,23 @@ class CustomDockTitleBar(QtWidgets.QWidget):
         self.dock_widget.hide()
 
 
-# if __name__ == "__main__":
-#     import sys
-#     from miao.utilities import configurations, error_log
-#     import time
-#
-#     app = QtWidgets.QApplication(sys.argv)
-#     cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
-#     cfg = configurations.MicroscopeConfiguration(cfd)
-#     pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
-#     try:
-#         os.makedirs(pth, exist_ok=True)
-#         print(f'Directory {pth} has been created successfully.')
-#     except Exception as e:
-#         print(f'Error creating directory {pth}: {e}')
-#     log_file = os.path.join(pth, time.strftime("%H%M%S") + 'app.log')
-#     lg = error_log.ErrorLog(log_file)
-#
-#     main_widget = MainWidget(cfg, lg, pth)
-#     main_widget.show()
-#     sys.exit(app.exec_())
+if __name__ == "__main__":
+    import sys
+    from miao.utilities import configurations, error_log
+    import time
+
+    app = QtWidgets.QApplication(sys.argv)
+    cfd = r"C:\Users\ruizhe.lin\Documents\data\config_files\microscope_configurations_slm_parallel_scan.json"
+    cfg = configurations.MicroscopeConfiguration(cfd)
+    pth = f"{cfg.configs['Data Path']}\\{time.strftime('%Y%m%d')}"
+    try:
+        os.makedirs(pth, exist_ok=True)
+        print(f'Directory {pth} has been created successfully.')
+    except Exception as e:
+        print(f'Error creating directory {pth}: {e}')
+    log_file = os.path.join(pth, time.strftime("%H%M%S") + 'app.log')
+    lg = error_log.ErrorLog(log_file)
+
+    main_widget = MainWidget(cfg, lg, pth)
+    main_widget.show()
+    sys.exit(app.exec_())
