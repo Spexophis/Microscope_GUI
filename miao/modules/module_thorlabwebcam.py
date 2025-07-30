@@ -44,25 +44,15 @@ class ThorCam:
             raise RuntimeError(f"Opening the ThorCam failed with error code {i}")
 
     def _config_cam(self):
-        try:
-            self.roi_shape = self.set_roi_shape((1024, 1024))
-        except Exception as e:
-            self.logg.error(f"{e}")
-            return
-        try:
-            self.roi_pos = self.set_roi_pos((0, 0))
-        except Exception as e:
-            self.logg.error(f"{e}")
-            return
+        self.set_roi()
         self.meminfo = None
         self.meminfo = self.initialize_memory()
-        pixel_clock = ct.c_uint(5)  # set pixel clock to 5 MHz
+        pixel_clock = ct.c_uint(43)  # set pixel clock to 5 MHz
         is_pixel_clock = self.uc480.is_PixelClock
         is_pixel_clock.argtypes = [ct.c_int, ct.c_uint, ct.POINTER(ct.c_uint), ct.c_uint]
         is_pixel_clock(self.handle, 6, ct.byref(pixel_clock), ct.sizeof(pixel_clock))  # 6 for setting pixel clock
         self.uc480.is_SetColorMode(self.handle, 6)  # 6 is for monochrome 8 bit. See uc480.h for definitions
-        self.frame_rate = self.set_frame_rate(4)
-        self.exposure = self.set_exposure(32)
+        self.frame_rate = self.set_frame_rate(25)
 
     def close(self):
         if self.handle is not None:
@@ -107,6 +97,18 @@ class ThorCam:
         else:
             raise RuntimeError(f"Set ThorCam ROI size failed with error code {i}")
 
+    def set_roi(self, x=0, y=0, nx=1024, ny=1024):
+        try:
+            self.roi_shape = self.set_roi_shape((nx, ny))
+        except Exception as e:
+            self.logg.error(f"{e}")
+            return
+        try:
+            self.roi_pos = self.set_roi_pos((x, y))
+        except Exception as e:
+            self.logg.error(f"{e}")
+            return
+
     def initialize_memory(self):
         if self.meminfo is not None:
             self.uc480.is_FreeImageMem(self.handle, self.meminfo[0], self.meminfo[1])
@@ -134,11 +136,14 @@ class ThorCam:
         is_exposure(self.handle, 12, exposure_c, 8)  # 12 is for setting exposure
         return exposure_c.value
 
+    def prepare_live(self):
+        pass
+
     def start_live(self):
         self.uc480.is_CaptureVideo(self.handle, 1)
 
     def stop_live(self):
         self.uc480.is_StopLiveVideo(self.handle, 1)
 
-    def get_image(self):
+    def get_last_image(self):
         return np.frombuffer(self.meminfo[0], ct.c_ubyte).reshape(self.roi_shape[1], self.roi_shape[0])

@@ -1,4 +1,4 @@
-from miao.processes import process_shwfs, process_trigger, process_flock
+from miao.processes import process_shwfs, process_trigger
 
 
 class MainProcess:
@@ -9,5 +9,4 @@ class MainProcess:
         self.data_folder = path
         self.shwfsr = process_shwfs.WavefrontSensing(self.logg.error_log)
         self.trigger = process_trigger.TriggerSequence(self.logg.error_log)
-        self.foc_ctrl = process_flock.FocusLocker()
         self.logg.error_log.info("All processing set up")

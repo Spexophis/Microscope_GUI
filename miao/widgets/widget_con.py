@@ -12,8 +12,8 @@ class ConWidget(QtWidgets.QWidget):
     Signal_galvo_set = QtCore.pyqtSignal(float, float)
     Signal_galvo_scan_update = QtCore.pyqtSignal()
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
-    Signal_daq_update = QtCore.pyqtSignal(int)
-    Signal_daq_reset = QtCore.pyqtSignal()
+    Signal_nucleo_update = QtCore.pyqtSignal(int)
+    Signal_nucleo_reset = QtCore.pyqtSignal()
     Signal_plot_trigger = QtCore.pyqtSignal()
     Signal_focus_finding = QtCore.pyqtSignal()
     Signal_video = QtCore.pyqtSignal(bool, str)
@@ -21,7 +21,6 @@ class ConWidget(QtWidgets.QWidget):
     Signal_plot_profile = QtCore.pyqtSignal(bool)
     Signal_add_profile = QtCore.pyqtSignal()
     Signal_set_mask = QtCore.pyqtSignal()
-    Signal_focal_array_scan = QtCore.pyqtSignal()
     Signal_alignment = QtCore.pyqtSignal()
     Signal_data_acquire = QtCore.pyqtSignal(str, int)
     Signal_save_file = QtCore.pyqtSignal(str)
@@ -280,11 +279,10 @@ class ConWidget(QtWidgets.QWidget):
     def _create_acquisition_widgets(self):
         layout_acquisition = QtWidgets.QGridLayout()
 
-        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Wide Field 3D",
-                                                                         "Dot Scan 2D", "Point Scan 2D"])
+        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Dot Scan 2D",
+                                                                          "Point Scan 2D", "FocArr Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)
         self.QPushButton_acquire = cw.PushButtonWidget('Acquire')
-        self.QPushButton_focal_array_scan = cw.PushButtonWidget('FocArr Scan')
         self.QPushButton_save_acquisition_timing_presets = cw.PushButtonWidget("Save AcqTTLs")
 
         layout_acquisition.addWidget(cw.LabelWidget(str('Acq Modes')), 0, 0, 1, 1)
@@ -292,7 +290,6 @@ class ConWidget(QtWidgets.QWidget):
         layout_acquisition.addWidget(cw.LabelWidget(str('Acq Number')), 0, 1, 1, 1)
         layout_acquisition.addWidget(self.QSpinBox_acquisition_number, 1, 1, 1, 1)
         layout_acquisition.addWidget(self.QPushButton_acquire, 1, 2, 1, 1)
-        layout_acquisition.addWidget(self.QPushButton_focal_array_scan, 0, 3, 1, 1)
         layout_acquisition.addWidget(self.QPushButton_save_acquisition_timing_presets, 1, 3, 1, 1)
 
         return layout_acquisition
@@ -319,7 +316,6 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_add_profile.clicked.connect(self.run_add_profile)
         self.QPushButton_set_mask.clicked.connect(self.set_array_mask)
         self.QPushButton_acquire.clicked.connect(self.run_acquisition)
-        self.QPushButton_focal_array_scan.clicked.connect(self.run_array_scan)
         self.QComboBox_live_modes.currentIndexChanged[str].connect(self.load_selected_digital_timing_presets)
         self.QComboBox_acquisition_modes.currentIndexChanged[str].connect(self.load_selected_digital_timing_presets)
         self.QPushButton_save_live_timing_presets.clicked.connect(lambda: self.save_digital_timing_preset("live"))

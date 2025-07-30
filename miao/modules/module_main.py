@@ -25,12 +25,13 @@ class MainModule:
             self.laser = module_coboltlaser.CoboltLaser(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
-        key = self.config.configs["Adaptive Optics"]["Deformable Mirrors"]
+        key = self.config.configs["Adaptive Optics"]["Deformable Mirrors"].keys()
         try:
-            self.dm = module_deformablemirror.DeformableMirror(name=key, logg=self.logg.error_log,
+            self.dm = module_deformablemirror.DeformableMirror(name=list(key)[0], logg=self.logg.error_log,
                                                                config=self.config, path=self.data_folder)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
+        self.nucleo = None
         self.logg.error_log.info("Finish initiating devices")
 
     def close(self):
