@@ -35,7 +35,6 @@ class MainController(QtCore.QObject):
         self.view_controller = controller_view.ViewController(self.v.view_view)
         self.con_controller = controller_con.ConController(self.v.con_view)
         self.ao_controller = controller_ao.AOController(self.v.ao_view)
-        self._setup_threads()
         self._set_signal_connections()
         self._initial_setup()
         self.lasers = []
@@ -43,44 +42,17 @@ class MainController(QtCore.QObject):
         self.cameras = {"imaging": 0, "wfs": 1, "focus_lock": 2}
         # dedicated thread pool for tasks
         self.task_worker = None
-        self.task_thread = QtCore.QThread()
-
-    def _setup_threads(self):
-        # video thread
-        self.videoWorker = LoopWorker(dt=100)
-        self.videoWorker.signal_loop.connect(self.imshow_main)
-        self.thread_video = QtCore.QThread()
-        self.videoWorker.moveToThread(self.thread_video)
-        self.thread_video.started.connect(self.videoWorker.start)
-        self.thread_video.finished.connect(self.videoWorker.stop)
-        # image process thread
-        self.fftWorker = LoopWorker(dt=250)
-        self.fftWorker.signal_loop.connect(self.imshow_fft)
-        self.thread_fft = QtCore.QThread()
-        self.fftWorker.moveToThread(self.thread_fft)
-        self.thread_fft.started.connect(self.fftWorker.start)
-        self.thread_fft.finished.connect(self.fftWorker.stop)
-        # focus lock thread
-        self.flocWorker = LoopWorker(dt=2000)
-        self.flocWorker.signal_loop.connect(self.focus_locking)
-        self.thread_floc = QtCore.QThread()
-        self.flocWorker.moveToThread(self.thread_floc)
-        self.thread_floc.started.connect(self.flocWorker.start)
-        self.thread_floc.finished.connect(self.flocWorker.stop)
-        # plot thread
-        self.plotWorker = LoopWorker(dt=250)
-        self.plotWorker.signal_loop.connect(self.profile_plot)
-        self.thread_plot = QtCore.QThread()
-        self.plotWorker.moveToThread(self.thread_plot)
-        self.thread_plot.started.connect(self.plotWorker.start)
-        self.thread_plot.finished.connect(self.plotWorker.stop)
-        # wavefront sensor thread
-        self.wfsWorker = LoopWorker(dt=125)
-        self.wfsWorker.signal_loop.connect(self.imshow_img_wfs)
-        self.thread_wfs = QtCore.QThread()
-        self.wfsWorker.moveToThread(self.thread_wfs)
-        self.thread_wfs.started.connect(self.wfsWorker.start)
-        self.thread_wfs.finished.connect(self.wfsWorker.stop)
+        self.task_thread = None
+        self.videoWorker = None
+        self.thread_video = None
+        self.fftWorker = None
+        self.thread_fft = None
+        self.flocWorker = None
+        self.thread_floc = None
+        self.plotWorker = None
+        self.thread_plot = None
+        self.wfsWorker = None
+        self.thread_wfs = None
 
     def _set_signal_connections(self):
         self.v.Signal_interrupt.connect(self.interrupt_thread)
@@ -182,6 +154,51 @@ class MainController(QtCore.QObject):
         self.task_thread.quit()
         self.task_thread.wait()
         self.v.dialog.close()
+
+    def setup_video_thread(self):
+        # video thread
+        self.videoWorker = LoopWorker(dt=100)
+        self.videoWorker.signal_loop.connect(self.imshow_main)
+        self.thread_video = QtCore.QThread()
+        self.videoWorker.moveToThread(self.thread_video)
+        self.thread_video.started.connect(self.videoWorker.start)
+        self.thread_video.finished.connect(self.videoWorker.stop)
+
+    def setup_fft_thread(self):
+        # image process thread
+        self.fftWorker = LoopWorker(dt=250)
+        self.fftWorker.signal_loop.connect(self.imshow_fft)
+        self.thread_fft = QtCore.QThread()
+        self.fftWorker.moveToThread(self.thread_fft)
+        self.thread_fft.started.connect(self.fftWorker.start)
+        self.thread_fft.finished.connect(self.fftWorker.stop)
+
+    def setup_fock_thread(self):
+        # focus lock thread
+        self.flocWorker = LoopWorker(dt=2000)
+        self.flocWorker.signal_loop.connect(self.focus_locking)
+        self.thread_floc = QtCore.QThread()
+        self.flocWorker.moveToThread(self.thread_floc)
+        self.thread_floc.started.connect(self.flocWorker.start)
+        self.thread_floc.finished.connect(self.flocWorker.stop)
+
+    def setup_plot_thread(self):
+        # plot thread
+        self.plotWorker = LoopWorker(dt=250)
+        self.plotWorker.signal_loop.connect(self.profile_plot)
+        self.thread_plot = QtCore.QThread()
+        self.plotWorker.moveToThread(self.thread_plot)
+        self.thread_plot.started.connect(self.plotWorker.start)
+        self.thread_plot.finished.connect(self.plotWorker.stop)
+
+    def setup_wfs_thread(self):
+        # wavefront sensor thread
+        self.wfsWorker = LoopWorker(dt=125)
+        self.wfsWorker.signal_loop.connect(self.imshow_img_wfs)
+        self.thread_wfs = QtCore.QThread()
+        self.wfsWorker.moveToThread(self.thread_wfs)
+        self.thread_wfs.started.connect(self.wfsWorker.start)
+        self.thread_wfs.finished.connect(self.wfsWorker.stop)
 
     @QtCore.pyqtSlot()
     def interrupt_thread(self):
@@ -444,6 +461,7 @@ class MainController(QtCore.QObject):
                                       digital_sequences=dtr, digital_channels=dch, finite=False)
         if vd_mod == "Focus Lock":
             self.logg.info(f"Focus Lock live")
+        self.setup_video_thread()
 
     def start_video(self, vm):
         try:
@@ -469,6 +487,9 @@ class MainController(QtCore.QObject):
             if self.thread_video.isRunning():
                 self.thread_video.quit()
                 self.thread_video.wait()
+        except Exception as e:
+            self.logg.error(f"Error stopping thread video: {e}")
+        try:
             self.m.daq.stop_triggers()
             self.m.slm.deactivate()
             self.m.cam_set[self.cameras["imaging"]].stop_live()
@@ -502,6 +523,7 @@ class MainController(QtCore.QObject):
 
     def run_fft(self):
         try:
+            self.setup_fft_thread()
             self.thread_fft.start()
         except Exception as e:
             self.logg.error(f"Error starting fft: {e}")
@@ -531,6 +553,7 @@ class MainController(QtCore.QObject):
 
     def start_plot_live(self):
         try:
+            self.setup_plot_thread()
             self.thread_plot.start()
         except Exception as e:
             self.logg.error(f"Error starting plot: {e}")
@@ -704,6 +727,7 @@ class MainController(QtCore.QObject):
         time.sleep(0.1)
         self.p.foc_ctrl.set_focus(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
         self.m.cam_set[self.cameras["focus_lock"]].stop_live()
+        self.setup_fock_thread()
 
     def lock_focus(self):
         try:
@@ -722,12 +746,15 @@ class MainController(QtCore.QObject):
 
     def release_focus(self):
         try:
-            if self.thread_floc.isRunning():
+            if self.thread_floc & self.thread_floc.isRunning():
                 self.thread_floc.quit()
                 self.thread_floc.wait()
+        except Exception as e:
+            self.logg.error(f"Error stopping thread focus lock: {e}")
+        try:
             self.m.cam_set[self.cameras["focus_lock"]].stop_live()
         except Exception as e:
-            self.logg.error(f"Error stopping imaging video: {e}")
+            self.logg.error(f"Error stopping focus lock: {e}")
 
     def focus_locking(self):
         self.p.foc_ctrl.update(self.m.cam_set[self.cameras["focus_lock"]].get_last_image())
@@ -1004,6 +1031,7 @@ class MainController(QtCore.QObject):
             self.con_controller.display_scmos_timings(clean=self.p.trigger.initial_time,
                                                       exposure=self.p.trigger.exposure_time,
                                                       standby=self.p.trigger.standby_time)
+        self.setup_wfs_thread()
 
     def start_img_wfs(self):
         try:
@@ -1025,6 +1053,9 @@ class MainController(QtCore.QObject):
             if self.thread_wfs.isRunning():
                 self.thread_wfs.quit()
                 self.thread_wfs.wait()
+        except Exception as e:
+            self.logg.error(f"Error stopping wfs thread: {e}")
+        try:
             self.m.cam_set[self.cameras["wfs"]].stop_live()
             self.m.daq.stop_triggers()
             self.lasers_off()
