@@ -7,56 +7,47 @@ import numpy as np
 
 
 class TriggerSequence:
-    class TriggerParameters:
-        def __init__(self, sample_rate=250000):
-            # daq
-            self.sample_rate = sample_rate  # Hz
-            # digital triggers
-            self.digital_starts = [0.0000, 0.00064, 0.00064, 0.00064]
-            self.digital_ends = [0.0001, 0.00074, 0.00074, 0.00074]
-            self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
-            self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
-            # piezo scanner
-            self.piezo_conv_factors = [10., 10., 10.]
-            self.piezo_steps = [0.04, 0.04, 0.16]
-            self.piezo_ranges = [0.2, 0.2, 0.0]
-            self.piezo_positions = [20., 20., 20.]
-            self.piezo_return_time = 0.08
-            self.return_samples = int(np.ceil(self.piezo_return_time * self.sample_rate))
-            self.piezo_steps = [step_size / conv_factor for step_size, conv_factor in
-                                zip(self.piezo_steps, self.piezo_conv_factors)]
-            self.piezo_ranges = [move_range / conv_factor for move_range, conv_factor in
-                                 zip(self.piezo_ranges, self.piezo_conv_factors)]
-            self.piezo_positions = [position / conv_factor for position, conv_factor in
-                                    zip(self.piezo_positions, self.piezo_conv_factors)]
-            self.piezo_starts = [i - j for i, j in zip(self.piezo_positions, [k / 2 for k in self.piezo_ranges])]
-            self.piezo_scan_pos = [int(np.ceil(safe_divide(scan_range, scan_step))) for scan_range, scan_step in
-                                   zip(self.piezo_ranges, self.piezo_steps)]
-            self.piezo_scan_positions = [start + step * np.arange(ns) for start, step, ns in
-                                         zip(self.piezo_starts, self.piezo_steps, self.piezo_scan_pos)]
-            # galvo switcher
-            self.galvo_sw_settle = 0.00064  # s
-            self.galvo_sw_settle_samples = int(np.ceil(self.galvo_sw_settle * self.sample_rate))
-            self.galvo_sw_states = [4., -2., 0.]
-            # emccd camera
-            self.cycle_time = 0.0021  # s
-            self.initial_time = 0.00159  # s
-            self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
-            self.standby_time = 0.00171  # s
-            self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-            self.exposure_samples = 0.0001  # s
-            self.exposure_time = self.exposure_samples / self.sample_rate
-            self.trigger_pulse_width = 50e-6  # s
-            self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
 
-    def __init__(self, logg=None):
+    def __init__(self, sample_rate=2.5e5, logg=None):
         self.logg = logg or self.setup_logging()
-        self._parameters = self.TriggerParameters()
-
-    def __getattr__(self, item):
-        if hasattr(self._parameters, item):
-            return getattr(self._parameters, item)
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
+        # daq
+        self.sample_rate = sample_rate  # Hz
+        # digital triggers
+        self.digital_starts = [0.0000, 0.001, 0.001, 0.001]
+        self.digital_ends = [0.001, 0.003, 0.003, 0.003]
+        self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
+        self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
+        # piezo scanner
+        self.piezo_conv_factors = [10., 10., 10.]
+        self.piezo_steps = [0.04, 0.04, 0.16]
+        self.piezo_ranges = [0.2, 0.2, 0.0]
+        self.piezo_positions = [20., 20., 20.]
+        self.piezo_return_time = 0.08
+        self.return_samples = int(np.ceil(self.piezo_return_time * self.sample_rate))
+        self.piezo_steps = [step_size / conv_factor for step_size, conv_factor in
+                            zip(self.piezo_steps, self.piezo_conv_factors)]
+        self.piezo_ranges = [move_range / conv_factor for move_range, conv_factor in
+                             zip(self.piezo_ranges, self.piezo_conv_factors)]
+        self.piezo_positions = [position / conv_factor for position, conv_factor in
+                                zip(self.piezo_positions, self.piezo_conv_factors)]
+        self.piezo_starts = [i - j for i, j in zip(self.piezo_positions, [k / 2 for k in self.piezo_ranges])]
+        self.piezo_scan_pos = [int(np.ceil(safe_divide(scan_range, scan_step))) for scan_range, scan_step in
+                               zip(self.piezo_ranges, self.piezo_steps)]
+        self.piezo_scan_positions = [start + step * np.arange(ns) for start, step, ns in
+                                     zip(self.piezo_starts, self.piezo_steps, self.piezo_scan_pos)]
+        # galvo switcher
+        self.galvo_sw_settle = 0.00064  # s
+        self.galvo_sw_settle_samples = int(np.ceil(self.galvo_sw_settle * self.sample_rate))
+        self.galvo_sw_states = [9.8, -9.8, 4.]
+        # camera
+        self.initial_time = 0.00159  # s
+        self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
+        self.standby_time = 0.00171  # s
+        self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
+        self.exposure_time = 0.0001  # s
+        self.exposure_samples = int(np.ceil(self.exposure_time * self.sample_rate))
+        self.trigger_pulse_width = 50e-6  # s
+        self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
 
     @staticmethod
     def setup_logging():
@@ -66,7 +57,7 @@ class TriggerSequence:
 
     def update_nidaq_parameters(self, sample_rate=None):
         if sample_rate is not None:
-            self._parameters = self.TriggerParameters(sample_rate)
+            self.sample_rate = sample_rate  # Hz
 
     def update_piezo_scan_parameters(self, piezo_ranges=None, piezo_steps=None, piezo_positions=None,
                                      piezo_return_time=None):
@@ -115,15 +106,13 @@ class TriggerSequence:
         self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
         self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
 
-    def update_camera_parameters(self, initial_time=None, standby_time=None, cycle_time=None):
+    def update_camera_parameters(self, initial_time=None, standby_time=None):
         if initial_time is not None:
             self.initial_time = initial_time
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
         if standby_time is not None:
             self.standby_time = standby_time
             self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-        if self.cycle_time is not None:
-            self.cycle_time = cycle_time
 
     def generate_slm_triggers(self, slm_seq="5ms_dark_pair"):
         if "400us" in slm_seq:
@@ -225,7 +214,7 @@ class TriggerSequence:
             cycle_samples = digital_triggers.shape[1] + compensate_samples
             compensate_sequence = np.zeros((digital_triggers.shape[0], compensate_samples))
             digital_triggers = np.concatenate((digital_triggers, compensate_sequence), axis=1)
-            compensate_sequence = switch_trigger[-1] * np.ones(compensate_samples)
+            compensate_sequence = switch_trigger[2] * np.ones(compensate_samples)
             switch_trigger = np.concatenate((switch_trigger, compensate_sequence))
         return digital_triggers, switch_trigger, cycle_samples, chs
 

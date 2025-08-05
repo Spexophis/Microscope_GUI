@@ -26,7 +26,6 @@ class NIDAQ:
             self.piezo_channels = ["Dev2/ao0", "Dev2/ao1", "Dev2/ao2"]
             self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line3", "Dev1/port0/line4", "Dev1/port0/line5"]
             self.counter_channel = "/Dev1/ctr0"
-            self.clock_rate = 2000000
             self.clock = ["/Dev1/PFI12", "/Dev2/PFI0"]
             self.mode = None
 
@@ -153,13 +152,12 @@ class NIDAQ:
     def write_clock_channel(self):
         try:
             self.tasks["clock"] = nidaqmx.Task("clock")
-            self.tasks["clock"].co_channels.add_co_pulse_chan_freq(self.counter_channel, units=FrequencyUnits.HZ,
-                                                                   idle_state=Level.LOW, initial_delay=0.0,
-                                                                   freq=self.sample_rate, duty_cycle=self.duty_cycle)
-            self.tasks["clock"].co_pulse_freq_timebase_src = '20MHzTimebase'
-            self.tasks["clock"].co_pulse_freq_timebase_rate = self.clock_rate
+            co_channel = self.tasks["clock"].co_channels.add_co_pulse_chan_freq(counter=self.counter_channel,
+                                                                               freq=self.sample_rate,
+                                                                               duty_cycle=self.duty_cycle)
+            co_channel.co_ctr_timebase_src = '20MHzTimebase'
+            co_channel.co_pulse_term = self.clock[0]
             self.tasks["clock"].timing.cfg_implicit_timing(sample_mode=AcquisitionType.CONTINUOUS)
-            self.tasks["clock"].co_pulse_term = self.clock[0]
             self._active["clock"] = True
         except nidaqmx.DaqWarning as e:
             self.logg.warning("DaqWarning caught as exception: %s", e)
@@ -362,7 +360,6 @@ class NIDAQ:
                                                           idle_state=Level.LOW, initial_delay=0.0,
                                                           freq=self.sample_rate, duty_cycle=self.duty_cycle)
             task_clock.co_pulse_freq_timebase_src = '20MHzTimebase'
-            task_clock.co_pulse_freq_timebase_rate = self.clock_rate
             task_clock.timing.cfg_implicit_timing(sample_mode=AcquisitionType.CONTINUOUS)
             # Configure DO as before
             task_do.do_channels.add_do_chan(output_channel, line_grouping=LineGrouping.CHAN_PER_LINE)
