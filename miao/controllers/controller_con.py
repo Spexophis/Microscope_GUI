@@ -74,17 +74,23 @@ class ConController:
         lasers = []
         if self.v.QRadioButton_laser_405.isChecked():
             lasers.append(0)
-        if self.v.QRadioButton_laser_488.isChecked():
+        if self.v.QRadioButton_laser_488_w.isChecked():
             lasers.append(1)
+        if self.v.QRadioButton_laser_488.isChecked():
+            lasers.append(2)
         return lasers
 
     def get_cobolt_laser_power(self, laser):
         if laser == "405":
             return [self.v.QDoubleSpinBox_laserpower_405.value()]
+        elif laser == "488_W":
+            return [self.v.QDoubleSpinBox_laserpower_488_w.value()]
         elif laser == "488":
             return [self.v.QDoubleSpinBox_laserpower_488.value()]
         elif laser == "all":
-            return [self.v.QDoubleSpinBox_laserpower_405.value(), self.v.QDoubleSpinBox_laserpower_488.value()]
+            return [self.v.QDoubleSpinBox_laserpower_405.value(),
+                    self.v.QDoubleSpinBox_laserpower_488_w.value(),
+                    self.v.QDoubleSpinBox_laserpower_488.value()]
         else:
             return None
 
@@ -94,10 +100,12 @@ class ConController:
 
     def get_digital_parameters(self):
         digital_starts = [self.v.QDoubleSpinBox_ttl_start_on_405.value(),
+                          self.v.QDoubleSpinBox_ttl_start_off_488.value(),
                           self.v.QDoubleSpinBox_ttl_start_read_488.value(),
                           self.v.QDoubleSpinBox_ttl_start_emccd.value(),
                           self.v.QDoubleSpinBox_ttl_start_scmos.value()]
         digital_ends = [self.v.QDoubleSpinBox_ttl_stop_on_405.value(),
+                        self.v.QDoubleSpinBox_ttl_stop_off_488.value(),
                         self.v.QDoubleSpinBox_ttl_stop_read_488.value(),
                         self.v.QDoubleSpinBox_ttl_stop_emccd.value(),
                         self.v.QDoubleSpinBox_ttl_stop_scmos.value()]

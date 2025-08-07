@@ -121,7 +121,7 @@ class MainController(QtCore.QObject):
 
             self.reset_piezo_positions()
 
-            self.laser_lists = ["405", "488"]
+            self.laser_lists = ["405", "488_w", "488"]
 
             for key in self.m.slm.ord_dict.keys():
                 self.v.con_view.QComboBox_slm_sequence.addItem(key)
@@ -441,7 +441,8 @@ class MainController(QtCore.QObject):
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
         self.update_trigger_parameters("imaging")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         if vd_mod == "Wide Field":
             self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
@@ -472,7 +473,8 @@ class MainController(QtCore.QObject):
             self.lasers_off()
             return
         try:
-            self.m.slm.activate()
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             self.m.cam_set[self.cameras["imaging"]].start_live()
             if self.cameras["imaging"] != self.cameras["focus_lock"]:
                 self.m.daq.run_triggers()
@@ -491,7 +493,8 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error stopping thread video: {e}")
         try:
             self.m.daq.stop_triggers()
-            self.m.slm.deactivate()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.lasers_off()
             if vm == "Scan Calib":

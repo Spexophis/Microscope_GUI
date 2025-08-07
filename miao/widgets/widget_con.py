@@ -264,20 +264,26 @@ class ConWidget(QtWidgets.QWidget):
     def _create_laser_widgets(self):
         layout_illumination = QtWidgets.QHBoxLayout()
 
-        self.QRadioButton_laser_405 = cw.RadioButtonWidget('405 nm')
+        self.QRadioButton_laser_405 = cw.RadioButtonWidget('wd - 405 nm')
         self.QDoubleSpinBox_laserpower_405 = cw.DoubleSpinBoxWidget(0, 200, 0.1, 1, 0.0)
         self.QPushButton_laser_405 = cw.PushButtonWidget('ON', checkable=True)
-        self.QRadioButton_laser_488 = cw.RadioButtonWidget('488 nm')
+        self.QRadioButton_laser_488_w = cw.RadioButtonWidget('wd - 488nm')
+        self.QDoubleSpinBox_laserpower_488_w = cw.DoubleSpinBoxWidget(0, 200, 0.1, 1, 0.0)
+        self.QPushButton_laser_488_w = cw.PushButtonWidget('ON', checkable=True)
+        self.QRadioButton_laser_488 = cw.RadioButtonWidget('mf - 488 nm')
         self.QDoubleSpinBox_laserpower_488 = cw.DoubleSpinBoxWidget(0, 200, 0.1, 1, 0.0)
         self.QPushButton_laser_488 = cw.PushButtonWidget('ON', checkable=True)
         self.laser_405_scroll_area, laser_405_scroll_layout = cw.create_scroll_area()
+        self.laser_488_w_scroll_area, laser_488_w_scroll_layout = cw.create_scroll_area()
         self.laser_488_scroll_area, laser_488_scroll_layout = cw.create_scroll_area()
         laser_405_scroll_layout.addRow(self.QRadioButton_laser_405, self.QDoubleSpinBox_laserpower_405)
         laser_405_scroll_layout.addRow(self.QPushButton_laser_405)
+        laser_488_w_scroll_layout.addRow(self.QRadioButton_laser_488_w, self.QDoubleSpinBox_laserpower_488_w)
+        laser_488_w_scroll_layout.addRow(self.QPushButton_laser_488_w)
         laser_488_scroll_layout.addRow(self.QRadioButton_laser_488, self.QDoubleSpinBox_laserpower_488)
         laser_488_scroll_layout.addRow(self.QPushButton_laser_488)
-
         layout_illumination.addWidget(self.laser_405_scroll_area)
+        layout_illumination.addWidget(self.laser_488_w_scroll_area)
         layout_illumination.addWidget(self.laser_488_scroll_area)
         return layout_illumination
 
@@ -289,6 +295,8 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_reset_daq = cw.PushButtonWidget("Reset")
         self.QDoubleSpinBox_ttl_start_on_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
         self.QDoubleSpinBox_ttl_stop_on_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
+        self.QDoubleSpinBox_ttl_start_off_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
+        self.QDoubleSpinBox_ttl_stop_off_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
         self.QDoubleSpinBox_ttl_start_read_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
         self.QDoubleSpinBox_ttl_stop_read_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
         self.QDoubleSpinBox_ttl_start_emccd = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
@@ -302,24 +310,27 @@ class ConWidget(QtWidgets.QWidget):
         layout_daq.addWidget(self.QPushButton_plot_trigger, 2, 0, 1, 1)
         layout_daq.addWidget(cw.LabelWidget(str('From / s')), 1, 1, 1, 1)
         layout_daq.addWidget(cw.LabelWidget(str('To / s')), 2, 1, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('DO#0 - L405')), 0, 2, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('DO#0 - wd405')), 0, 2, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_on_405, 1, 2, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_on_405, 2, 2, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('DO#3 - L488')), 0, 5, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_read_488, 1, 5, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_read_488, 2, 5, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('DO#4 - iXon')), 0, 6, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_emccd, 1, 6, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_emccd, 2, 6, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('DO#5 - ORCA')), 0, 7, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_scmos, 1, 7, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_scmos, 2, 7, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('DO#1 - wd488')), 0, 5, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_off_488, 1, 5, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_off_488, 2, 5, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('DO#3 - mf488')), 0, 6, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_read_488, 1, 6, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_read_488, 2, 6, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('DO#4 - iXon')), 0, 7, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_emccd, 1, 7, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_emccd, 2, 7, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('DO#5 - ORCA')), 0, 8, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_scmos, 1, 8, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_scmos, 2, 8, 1, 1)
         return layout_daq
 
     def _create_acquisition_widgets(self):
         layout_acquisition = QtWidgets.QGridLayout()
         self.QComboBox_imaging_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "TIS"])
-        self.QComboBox_slm_sequence = cw.ComboBoxWidget(list_items=[])
+        self.QComboBox_slm_sequence = cw.ComboBoxWidget(list_items=["None"])
         self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Focus Lock", "Scan Calib"])
         self.QPushButton_video = cw.PushButtonWidget("Video", checkable=True)
         self.QPushButton_fft = cw.PushButtonWidget("FFT", checkable=True, enable=False)
@@ -376,6 +387,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_path_switch_galvo_x.valueChanged.connect(self.set_path_switch_galvo_x)
         self.QDoubleSpinBox_path_switch_galvo_y.valueChanged.connect(self.set_path_switch_galvo_y)
         self.QPushButton_laser_405.clicked.connect(self.set_laser_405)
+        self.QPushButton_laser_488_w.clicked.connect(self.set_laser_488_w)
         self.QPushButton_laser_488.clicked.connect(self.set_laser_488)
         self.QSpinBox_daq_sample_rate.valueChanged.connect(self.update_daq)
         self.QPushButton_reset_daq.clicked.connect(self.reset_daq)
@@ -472,14 +484,19 @@ class ConWidget(QtWidgets.QWidget):
         self.Signal_galvo_path_switch.emit(1, value)
 
     @QtCore.pyqtSlot(bool)
-    def set_laser_488(self, checked: bool):
-        power = self.QDoubleSpinBox_laserpower_488.value()
-        self.Signal_set_laser.emit(["488"], checked, power)
-
-    @QtCore.pyqtSlot(bool)
     def set_laser_405(self, checked: bool):
         power = self.QDoubleSpinBox_laserpower_405.value()
         self.Signal_set_laser.emit(["405"], checked, power)
+
+    @QtCore.pyqtSlot(bool)
+    def set_laser_488_w(self, checked: bool):
+        power = self.QDoubleSpinBox_laserpower_488_w.value()
+        self.Signal_set_laser.emit(["488_w"], checked, power)
+
+    @QtCore.pyqtSlot(bool)
+    def set_laser_488(self, checked: bool):
+        power = self.QDoubleSpinBox_laserpower_488.value()
+        self.Signal_set_laser.emit(["488"], checked, power)
 
     @QtCore.pyqtSlot(int)
     def update_daq(self, sample_rate: int):

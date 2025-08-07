@@ -24,7 +24,8 @@ class NIDAQ:
             self.duty_cycle = 0.5
             self.galvo_channels = ["Dev1/ao0", "Dev1/ao1"]
             self.piezo_channels = ["Dev2/ao0", "Dev2/ao1", "Dev2/ao2"]
-            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line3", "Dev1/port0/line4", "Dev1/port0/line5"]
+            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line3",
+                                     "Dev1/port0/line4", "Dev1/port0/line5"]
             self.counter_channel = "/Dev1/ctr0"
             self.clock = ["/Dev1/PFI12", "/Dev2/PFI0"]
             self.mode = None
