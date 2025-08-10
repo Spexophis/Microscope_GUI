@@ -431,7 +431,7 @@ class EMCCDCamera:
         ret, first, last = self.sdk.GetNumberAvailableImages()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
             self.acq_first, self.acq_last = first, last
-            self.logg.info(first, last)
+            self.logg.info("Available images: %d–%d", first, last)
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 

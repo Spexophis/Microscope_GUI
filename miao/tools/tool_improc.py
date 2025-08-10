@@ -113,7 +113,7 @@ def fit_gaussian(image, verbose=False, plot=False, bounds=None):
         ax.plot(y, y_max, color='b', label='y_max', linestyle='--')
         ax.plot(y, y_crv, color='b', label='y_curve: (FWHM=%0.1f)' % yp[4])
         ax.legend(loc="upper right")
-        fig.savefig('guassian_fit', dpi=150)
+        fig.savefig('gaussian_fit', dpi=150)
         fig.show()
     return xp, yp
 

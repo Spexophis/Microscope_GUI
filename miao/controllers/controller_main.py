@@ -513,7 +513,7 @@ class MainController(QtCore.QObject):
     def imshow_main(self):
         try:
             self.view_controller.plot_main(self.m.cam_set[self.cameras["imaging"]].get_last_image(),
-                                           layer=self.cameras["imaging"])
+                                            layer=self.cameras["imaging"])
         except Exception as e:
             self.logg.error(f"Error showing imaging video: {e}")
 
@@ -643,7 +643,8 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
         self.update_trigger_parameters("imaging")
         dtr, sw, dch = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"], self.slm_seq)
@@ -670,6 +671,8 @@ class MainController(QtCore.QObject):
             data = []
             data_calib = []
             pzs = []
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             self.m.cam_set[self.cameras["imaging"]].start_live()
             self.m.cam_set[self.cameras["focus_lock"]].start_live()
             for i, z in enumerate(zps):
@@ -705,10 +708,12 @@ class MainController(QtCore.QObject):
 
     def finish_focus_finding(self):
         try:
+            self.m.daq.stop_triggers()
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.m.cam_set[self.cameras["focus_lock"]].stop_live()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
             self.lasers_off()
-            self.m.daq.stop_triggers()
             self.reset_piezo_positions()
             self.logg.info("Focus finding stack acquired")
         except Exception as e:
@@ -777,7 +782,8 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         self.update_trigger_parameters("imaging")
         self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
@@ -798,6 +804,8 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error preparing widefield zstack: {e}")
             return
         try:
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             self.m.daq.run_triggers()
             time.sleep(0.2)
@@ -813,9 +821,11 @@ class MainController(QtCore.QObject):
 
     def finish_widefield_zstack(self):
         try:
+            self.m.daq.stop_triggers()
             self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
             self.lasers_off()
-            self.m.daq.stop_triggers()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
             self.reset_piezo_positions()
             self.logg.info("Widefield image stack acquired")
         except Exception as e:
@@ -1009,7 +1019,7 @@ class MainController(QtCore.QObject):
 
     def set_img_wfs(self):
         parameters = self.ao_controller.get_parameters_img()
-        self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
+        # self.p.shwfsr.pixel_size = self.pixel_sizes[self.cameras["wfs"]] / 1000
         self.p.shwfsr.update_parameters(parameters)
         self.logg.info('SHWFS parameter updated')
 
@@ -1304,7 +1314,8 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
         if vd_mod == "Wide Field":
             self.update_trigger_parameters("imaging")
@@ -1357,7 +1368,8 @@ class MainController(QtCore.QObject):
             zp = [0] * self.dfm.n_zernike
             cmd = self.dfm.dm_cmd[self.dfm.current_cmd]
             self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.1)
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             self.logg.info("Sensorless AO iterations start")
             self.dfm.set_dm(cmd)
             time.sleep(0.016)
@@ -1451,6 +1463,8 @@ class MainController(QtCore.QObject):
         try:
             self.lasers_off()
             self.m.daq.stop_triggers()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.logg.info("sensorless AO finished")
         except Exception as e:

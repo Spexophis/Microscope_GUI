@@ -24,15 +24,15 @@ class WavefrontSensing:
 
     def __init__(self, logg=None):
         self.logg = logg or self.setup_logging()
-        self.n_lenslets_x = 18
-        self.n_lenslets_y = 18
+        self.n_lenslets_x = 20
+        self.n_lenslets_y = 20
         self.n_lenslets = self.n_lenslets_x * self.n_lenslets_y
-        self.x_center_base = 1231
-        self.y_center_base = 926
-        self.x_center_offset = 1231
-        self.y_center_offset = 926
-        self.lenslet_spacing = 23  # spacing between each lenslet
-        self.hsp = 16  # size of subimage is 2 * hsp
+        self.x_center_base = 899
+        self.y_center_base = 981
+        self.x_center_offset = 899
+        self.y_center_offset = 981
+        self.lenslet_spacing = 21  # spacing between each lenslet
+        self.hsp = 12  # size of subimage is 2 * hsp
         self.bg = 0.1
         self.pixel_size = .0065  # mm
         self.calfactor = (self.pixel_size / 5.2) * 150  # pixel size * focalLength * pitch
@@ -87,8 +87,6 @@ class WavefrontSensing:
     def wavefront_reconstruction(self, md='correlation', rt=False):
         (gradx, grady) = self.get_gradient_xy(mtd=md)
         self.wf = self.gradient_to_wavefront(gradx, grady)
-        if rt:
-            return self.wf
 
     def gradient_to_wavefront(self, gradx, grady):
         gradx = np.pad(gradx, ((1, 1), (1, 1)), 'constant')
