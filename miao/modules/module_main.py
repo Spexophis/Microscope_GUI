@@ -2,7 +2,7 @@ from miao.modules import module_thorlabcam
 from miao.modules import module_thorlabwebcam
 from miao.modules import module_coboltlaser
 from miao.modules import module_deformablemirror
-from miao.modules import module_arduino
+from miao.modules import module_board
 
 class MainModule:
 
@@ -32,7 +32,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.uno = module_arduino.ArduinoUno(logg=self.logg.error_log, config=self.config)
+            self.uno = module_board.Boards(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")
