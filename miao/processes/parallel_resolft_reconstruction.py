@@ -13,11 +13,11 @@ from skimage.feature import peak_local_max
 class ImageReconstruction:
 
     def __init__(self):
-        self.na = 1.4
+        self.na = 1.3
         self.wl = 0.5
         self.resolution = self.wl / (2 * self.na)
-        self.pixel_size_x = 0.081
-        self.pixel_size_y = 0.081
+        self.pixel_size_x = 0.068783
+        self.pixel_size_y = 0.068783
         self.sigma = self.resolution / (2 * np.sqrt(2 * np.log(2)))
         self.wd = 2
 
@@ -221,9 +221,10 @@ if __name__ == "__main__":
     plt.ion()
 
     r = ImageReconstruction()
-    r.load_data(r"C:\Users\ruizhe.lin\Desktop\resolft_ao_data\20241128151717_dot_scanning_wao_crop.tif")
-    r.pixel_size_x = 0.081
-    r.pixel_size_y = 0.081
+    fn = r"C:\Users\ruizhe.lin\Documents\data\20250819\20250819150002_monalisa_scanning_multifocal_parallel_scan.tif"
+    r.load_data(fn)
+    r.pixel_size_x = 0.068783
+    r.pixel_size_y = 0.068783
     r.generate_coordinates()
     r.set_scanning_parameters(step_nums=(30, 30), step_sizes=(0.028, 0.028))
     r.subtract_background(bg=400)
@@ -239,15 +240,15 @@ if __name__ == "__main__":
     arr_x = np.sum(arr, axis=0)
     arr_y = np.sum(arr, axis=1)
 
-    pk_x = r.x_centers / r.pixel_size_x
-    updated_pk_x = r.find_closest_peak(pk_x, peak_x, r.period_x_um / r.pixel_size_x)
-    pk_y = r.y_centers / r.pixel_size_y
-    updated_pk_y = r.find_closest_peak(pk_y, peak_y, r.period_y_um / r.pixel_size_y)
-    r.x_centers = updated_pk_x * r.pixel_size_x
-    r.y_centers = updated_pk_y * r.pixel_size_y
-    arr = r.generate_center_array()
-    arr_x = np.sum(arr, axis=0)
-    arr_y = np.sum(arr, axis=1)
+    # pk_x = r.x_centers / r.pixel_size_x
+    # updated_pk_x = r.find_closest_peak(pk_x, peak_x, r.period_x_um / r.pixel_size_x)
+    # pk_y = r.y_centers / r.pixel_size_y
+    # updated_pk_y = r.find_closest_peak(pk_y, peak_y, r.period_y_um / r.pixel_size_y)
+    # r.x_centers = updated_pk_x * r.pixel_size_x
+    # r.y_centers = updated_pk_y * r.pixel_size_y
+    # arr = r.generate_center_array()
+    # arr_x = np.sum(arr, axis=0)
+    # arr_y = np.sum(arr, axis=1)
     plt.figure()
     plt.plot(data_avg_x, label="Data")
     plt.plot(arr_x * data_avg_x.max() / r.nxc, label="Center")

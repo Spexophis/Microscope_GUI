@@ -42,11 +42,11 @@ class TriggerSequence:
         # camera
         self.initial_time = 0.00159  # s
         self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
-        self.standby_time = 0.00171  # s
+        self.standby_time = 0.03893  # s
         self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-        self.exposure_time = 0.0001  # s
+        self.exposure_time = 0.005  # s
         self.exposure_samples = int(np.ceil(self.exposure_time * self.sample_rate))
-        self.trigger_pulse_width = 50e-6  # s
+        self.trigger_pulse_width = 1e-4  # s
         self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
 
     @staticmethod
@@ -123,7 +123,7 @@ class TriggerSequence:
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(720.96e-6 * self.sample_rate)
             act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
-            act_seq[:samps_total] = 1
+            act_seq[:self.trigger_pulse_samples] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         elif "600us" in slm_seq:
@@ -134,7 +134,7 @@ class TriggerSequence:
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(921.067e-6 * self.sample_rate)
             act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
-            act_seq[:samps_total] = 1
+            act_seq[:self.trigger_pulse_samples] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         elif "5ms" in slm_seq:
@@ -145,7 +145,7 @@ class TriggerSequence:
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(5.270187e-3 * self.sample_rate)
             act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
-            act_seq[:samps_total] = 1
+            act_seq[:self.trigger_pulse_samples] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         elif "10ms" in slm_seq:
@@ -156,7 +156,7 @@ class TriggerSequence:
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(10.270187e-3 * self.sample_rate)
             act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
-            act_seq[:samps_total] = 1
+            act_seq[:self.trigger_pulse_samples] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         elif "20ms" in slm_seq:
@@ -167,7 +167,7 @@ class TriggerSequence:
             samps_start = int(270.187e-6 * self.sample_rate)
             samps_end = round(20.270187e-3 * self.sample_rate)
             act_seq = np.zeros(samps_total * 2, dtype=np.uint8)
-            act_seq[:samps_total] = 1
+            act_seq[:self.trigger_pulse_samples] = 1
             cam_seq = np.zeros(samps_total * 2, dtype=np.uint8)
             cam_seq[samps_start:samps_end] = 1
         else:

@@ -126,8 +126,7 @@ class MainController(QtCore.QObject):
             for key in self.m.slm.ord_dict.keys():
                 self.v.con_view.QComboBox_slm_sequence.addItem(key)
 
-            self.pixel_sizes = [0., 0., 0.]
-            self.pixel_sizes[0] = 0.068783
+            self.pixel_sizes = [0.068783, 6.5]
 
             self.dm_cmd_ind = {}
             for key in self.m.dm.keys():
@@ -1344,8 +1343,6 @@ class MainController(QtCore.QObject):
     def sensorless_iterations(self):
         try:
             lpr, hpr, slf, mf, err = self.ao_controller.get_ao_parameters()
-            if mf == 'Mask(Intensity)':
-                msk = self.view_controller.get_image_data(7)
             name = time.strftime("%Y%m%d_%H%M%S_") + self.dfm.dm_serial + '_ao_iterations_' + mf
             new_folder = os.path.join(self.data_folder, name)
             os.makedirs(new_folder, exist_ok=True)
@@ -1359,6 +1356,12 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Prepare sensorless iteration Error: {e}")
             return
         try:
+            if mf == 'Mask(Intensity)':
+                msk = self.view_controller.get_image_data(7)
+            if mf == "Selected(FFT)":
+                size = (self.m.cam_set[self.cameras["imaging"]].pixels_x, self.m.cam_set[self.cameras["imaging"]].pixels_y)
+                gsk, msk = ipr.selected_frequency(size, self.pixel_sizes[0], [slf, slf/2, slf/3, -slf, -slf/2, -slf/3])
+                self.view_controller.plot_msk(data=gsk * msk)
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
             md = self.ao_controller.get_img_wfs_method()
             amprange = [amp_start + step_number * amp_step for step_number in range(amp_step_number)]
@@ -1391,7 +1394,7 @@ class MainController(QtCore.QObject):
                 if mf == "HighPass(FFT)":
                     mts = [ipr.hpf(img, hpr) for img in images]
                 if mf == "Selected(FFT)":
-                    mts = [ipr.selected_frequency(img, [slf, 2 * slf]) for img in images]
+                    mts = [ipr.selected_fft_amp(img, msk, gsk, False) for img in images]
                 std = np.std(mts)
                 fn = new_folder + r"\original.tiff"
                 tf.imwrite(str(fn), np.asarray(images))
@@ -1417,7 +1420,7 @@ class MainController(QtCore.QObject):
                 if mf == "HighPass(FFT)":
                     mts = [ipr.hpf(img, hpr) for img in images]
                 if mf == "Selected(FFT)":
-                    mts = [ipr.selected_frequency(img, [slf, 2 * slf]) for img in images]
+                    mts = [ipr.selected_fft_amp(img, msk, gsk, False) for img in images]
                 self.logg.info(f"zernike mode #{mode}, ({amprange}), ({mts})")
                 self.sig_plt.emit(amprange, mts)
                 if err:

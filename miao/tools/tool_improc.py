@@ -4,6 +4,7 @@
 
 
 import numpy as np
+import itertools
 from numpy.fft import fft2, fftshift
 from scipy.optimize import curve_fit
 from skimage import filters
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 
 wl = 0.5  # wavelength in microns
 na = 1.4  # numerical aperture
-dx = 0.081  # pixel size in microns
+dx = 0.068783  # pixel size in microns
 fs = 1 / dx  # Spatial sampling frequency, inverse microns
 
 
@@ -155,30 +156,36 @@ def fft_frequency_2dmap(rows, cols, psy, psx):
     return fftshift(frequency_map)
 
 
-def selected_frequency(img, freqs, relative=True):
-    _ny, _nx = img.shape
-    df = fs / _nx
+def selected_frequency(size, px, frequencies):
+    _ny, _nx = size
+    dpx = 1 / px
+    df = dpx / _nx
     radius = (na / wl) / df
-    freq_x = fftshift(np.fft.fftfreq(_nx, dx))
-    freq_y = fftshift(np.fft.fftfreq(_ny, dx))
+    freq_x = fftshift(np.fft.fftfreq(_nx, px))
+    freq_y = fftshift(np.fft.fftfreq(_ny, px))
     freq_x = np.divide(1.0, freq_x, where=freq_x != 0, out=np.zeros_like(freq_x))
     freq_y = np.divide(1.0, freq_y, where=freq_y != 0, out=np.zeros_like(freq_y))
-    freq_coords = []
-    for freq in freqs:
-        horizontal_indices = np.argsort(np.abs(freq_x - freq))[:2]
-        horizontal_coords = [(x, _ny // 2) for x in horizontal_indices]
-        vertical_indices = np.argsort(np.abs(freq_y - freq))[:2]
-        vertical_coords = [(_nx // 2, y) for y in vertical_indices]
-        freq_coords += horizontal_coords + vertical_coords
-    msk = disc_array(shape=(_ny, _nx), radi=0.9 * radius)
+    horizontal_indices = []
+    vertical_indices = []
+    for frequency in frequencies:
+        horizontal_indices.extend(list(np.argsort(np.abs(freq_x - frequency))[:2]))
+        vertical_indices.extend(list(np.argsort(np.abs(freq_y - frequency))[:2]))
+    horizontal_indices.append(_ny//2)
+    vertical_indices.append(_nx//2)
+    freq_crds = list(itertools.product(horizontal_indices, vertical_indices))
+    m = disc_array(shape=(_ny, _nx), radi=radius)
     g = np.zeros((_ny, _nx))
-    for freq_coord in freq_coords:
-        g += disc_array(shape=(_ny, _nx), radi=9, origin=freq_coord)
+    for freq_coord in freq_crds:
+        g += disc_array(shape=(_ny, _nx), radi=5, origin=freq_coord)
+    return g, m
+
+
+def selected_fft_amp(img, msk, gsk, relative=True):
     wft = np.fft.fftshift(np.fft.fft2(img))
     if relative:
-        return (np.abs(wft * g)).sum() / (np.abs(wft * msk)).sum()
+        return (np.abs(wft * gsk)).sum() / (np.abs(wft * msk)).sum()
     else:
-        return (np.abs(wft * g)).sum()
+        return (np.abs(wft * gsk)).sum()
 
 
 def snr(img, lpr, hpr, relative=True, gau=True):
