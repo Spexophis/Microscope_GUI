@@ -1028,7 +1028,8 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
@@ -1053,6 +1054,8 @@ class MainController(QtCore.QObject):
             self.stop_img_wfs()
         try:
             self.m.cam_set[self.cameras["wfs"]].start_live()
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             self.m.daq.run_triggers()
             self.thread_wfs.start()
         except Exception as e:
@@ -1068,8 +1071,10 @@ class MainController(QtCore.QObject):
         except Exception as e:
             self.logg.error(f"Error stopping wfs thread: {e}")
         try:
-            self.m.cam_set[self.cameras["wfs"]].stop_live()
             self.m.daq.stop_triggers()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
+            self.m.cam_set[self.cameras["wfs"]].stop_live()
             self.lasers_off()
         except Exception as e:
             self.logg.error(f"Error stopping wfs: {e}")
@@ -1153,7 +1158,8 @@ class MainController(QtCore.QObject):
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.slm_seq = self.con_controller.get_slm_sequence()
-        self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        if self.slm_seq != "None":
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs()
         self.update_trigger_parameters("wfs")
@@ -1179,11 +1185,13 @@ class MainController(QtCore.QObject):
         try:
             n, amp = self.ao_controller.get_actuator()
             self.m.cam_set[self.cameras["wfs"]].start_live()
+            if self.slm_seq != "None":
+                self.m.slm.activate()
             time.sleep(0.02)
             for i in range(self.dfm.n_actuator):
                 shimg = []
                 self.v.dialog_text.setText(f"actuator {i}")
-                values = [0.] * self.dfm.n_actuator
+                values = self.dfm.dm_cmd[self.dfm.current_cmd]
                 self.dfm.set_dm(values)
                 time.sleep(0.02)
                 self.m.daq.run_triggers()
@@ -1197,7 +1205,7 @@ class MainController(QtCore.QObject):
                 time.sleep(0.08)
                 shimg.append(self.m.cam_set[self.cameras["wfs"]].get_last_image())
                 self.m.daq.stop_triggers(_close=False)
-                values = [0.] * self.dfm.n_actuator
+                values = self.dfm.dm_cmd[self.dfm.current_cmd]
                 self.dfm.set_dm(values)
                 time.sleep(0.02)
                 self.m.daq.run_triggers()
@@ -1228,9 +1236,11 @@ class MainController(QtCore.QObject):
 
     def finish_influence_function(self):
         try:
-            self.lasers_off()
-            self.m.cam_set[self.cameras["wfs"]].stop_live()
             self.m.daq.stop_triggers()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
+            self.m.cam_set[self.cameras["wfs"]].stop_live()
+            self.lasers_off()
         except Exception as e:
             self.logg.error(f"Error finishing influence function: {e}")
 
