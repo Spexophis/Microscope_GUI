@@ -331,7 +331,7 @@ class ConWidget(QtWidgets.QWidget):
         layout_acquisition = QtWidgets.QGridLayout()
         self.QComboBox_imaging_camera_selection = cw.ComboBoxWidget(list_items=["EMCCD", "SCMOS", "TIS"])
         self.QComboBox_slm_sequence = cw.ComboBoxWidget(list_items=["None"])
-        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Focus Lock", "Scan Calib"])
+        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "SIM", "Focus Lock", "Scan Calib"])
         self.QPushButton_video = cw.PushButtonWidget("Video", checkable=True)
         self.QPushButton_fft = cw.PushButtonWidget("FFT", checkable=True, enable=False)
         self.QComboBox_profile_axis = cw.ComboBoxWidget(list_items=["X", "Y"])
@@ -340,6 +340,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_set_mask = cw.PushButtonWidget("Set Mask")
         self.QPushButton_save_live_timing_presets = cw.PushButtonWidget("Save Live TTLs")
         self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Wide Field 3D",
+                                                                         "SIM 2D", "SIM 3D",
                                                                          "Monalisa Scan 2D", "Monalisa Scan 3D",
                                                                          "Point Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)

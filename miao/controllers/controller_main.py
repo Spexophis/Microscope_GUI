@@ -454,6 +454,18 @@ class MainController(QtCore.QObject):
                 self.con_controller.display_scmos_timings(clean=self.p.trigger.initial_time,
                                                           exposure=self.p.trigger.exposure_time,
                                                           standby=self.p.trigger.standby_time)
+        if vd_mod == "SIM":
+            self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
+            dtr, sw, chs = self.p.trigger.generate_sim_triggers(self.lasers, self.cameras["imaging"], self.slm_seq, 2)
+            self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
+            if self.cameras["imaging"] == 0:
+                self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                          exposure=self.p.trigger.exposure_time,
+                                                          standby=self.p.trigger.standby_time)
+            if self.cameras["imaging"] == 1:
+                self.con_controller.display_scmos_timings(clean=self.p.trigger.initial_time,
+                                                          exposure=self.p.trigger.exposure_time,
+                                                          standby=self.p.trigger.standby_time)
         if vd_mod == "Scan Calib":
             self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
             dtr, sw, ptr, dch, pch = self.p.trigger.generate_piezo_line_scan(self.lasers, self.cameras["imaging"])
@@ -615,6 +627,10 @@ class MainController(QtCore.QObject):
             self.run_widefield_zstack(acq_num)
         elif acq_mod == "Monalisa Scan 2D":
             self.run_monalisa_scan(acq_num)
+        elif acq_mod == "SIM 2D":
+            self.run_sim_2d(acq_num)
+        elif acq_mod == "SIM 3D":
+            self.run_sim_3d(acq_num)
         else:
             self.logg.error(f"Invalid video mode")
 
@@ -660,6 +676,8 @@ class MainController(QtCore.QObject):
             self.prepare_focus_finding()
         except Exception as e:
             self.logg.error(f"Error starting focus finding: {e}")
+            self.m.daq.stop_triggers()
+            self.lasers_off()
             return
         try:
             pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
@@ -801,6 +819,8 @@ class MainController(QtCore.QObject):
             self.prepare_widefield_zstack()
         except Exception as e:
             self.logg.error(f"Error preparing widefield zstack: {e}")
+            self.m.daq.stop_triggers()
+            self.lasers_off()
             return
         try:
             if self.slm_seq != "None":
@@ -834,6 +854,126 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.widefield_zstack, iteration=n)
 
+    def prepare_sim_2d(self):
+        self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        if self.slm_seq == "None":
+            raise ValueError("SLM sequence cannot be None.")
+        else:
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.update_trigger_parameters("imaging")
+        self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
+        dtr, sw, dch = self.p.trigger.generate_sim_triggers(self.lasers, self.cameras["imaging"], self.slm_seq, 2)
+        self.m.cam_set[self.cameras["imaging"]].acq_num = 3
+        self.m.daq.write_triggers(digital_sequences=dtr, digital_channels=dch, finite=True)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
+
+    def sim_2d(self):
+        try:
+            self.prepare_sim_2d()
+        except Exception as e:
+            self.logg.error(f"Error preparing widefield zstack: {e}")
+            self.m.daq.stop_triggers()
+            self.lasers_off()
+            return
+        try:
+            self.m.slm.activate()
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            time.sleep(0.2)
+            self.m.daq.run_triggers()
+            time.sleep(0.2)
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_sim_2d',
+                           self.m.cam_set[self.cameras["imaging"]].get_data(),
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
+                           self.p.trigger.piezo_scan_positions)
+        except Exception as e:
+            self.finish_sim_2d()
+            self.logg.error(f"Error running widefield zstack: {e}")
+            return
+        self.finish_sim_2d()
+
+    def finish_sim_2d(self):
+        try:
+            self.m.daq.stop_triggers()
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.lasers_off()
+            self.m.slm.deactivate()
+            self.logg.info("Widefield image stack acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping widefield zstack: {e}")
+
+    def run_sim_2d(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.sim_2d, iteration=n)
+
+    def prepare_sim_3d(self):
+        self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.slm_seq = self.con_controller.get_slm_sequence()
+        if self.slm_seq == "None":
+            raise ValueError("SLM sequence cannot be None.")
+        else:
+            self.m.slm.select_order(self.m.slm.ord_dict[self.slm_seq])
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        self.update_trigger_parameters("imaging")
+        self.set_switch(0, self.p.trigger.galvo_sw_states[self.cameras["imaging"]])
+        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_sim_3d(self.lasers, self.cameras["imaging"], self.slm_seq)
+        self.m.daq.set_piezo_position(pos=[ptr[0]], indices=[2])
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos * 5
+        self.m.daq.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
+                                  finite=True)
+        self.con_controller.display_emccd_timings(clean=self.p.trigger.initial_time,
+                                                  exposure=self.p.trigger.exposure_time,
+                                                  standby=self.p.trigger.standby_time)
+
+    def sim_3d(self):
+        try:
+            self.prepare_sim_3d()
+        except Exception as e:
+            self.logg.error(f"Error preparing widefield zstack: {e}")
+            self.m.daq.stop_triggers()
+            self.lasers_off()
+            return
+        try:
+            if self.slm_seq != "None":
+                self.m.slm.activate()
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            self.m.daq.run_triggers()
+            time.sleep(0.2)
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack',
+                           self.m.cam_set[self.cameras["imaging"]].get_data(),
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
+                           self.p.trigger.piezo_scan_positions)
+        except Exception as e:
+            self.finish_sim_3d()
+            self.logg.error(f"Error running widefield zstack: {e}")
+            return
+        self.finish_sim_3d()
+
+    def finish_sim_3d(self):
+        try:
+            self.m.daq.stop_triggers()
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.lasers_off()
+            if self.slm_seq != "None":
+                self.m.slm.deactivate()
+            self.reset_piezo_positions()
+            self.logg.info("Widefield image stack acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping widefield zstack: {e}")
+
+    def run_sim_3d(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.sim_3d, iteration=n)
+
     def prepare_monalisa_scan_2d(self):
         self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
@@ -858,6 +998,8 @@ class MainController(QtCore.QObject):
             self.prepare_monalisa_scan_2d()
         except Exception as e:
             self.logg.error(f"Error preparing monalisa scanning: {e}")
+            self.m.daq.stop_triggers()
+            self.lasers_off()
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()

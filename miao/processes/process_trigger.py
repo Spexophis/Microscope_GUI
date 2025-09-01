@@ -175,6 +175,45 @@ class TriggerSequence:
             raise ValueError("SLM sequence is wrong.")
         return act_seq, cam_seq, expo_on, samps_on
 
+    def generate_sim_triggers(self, lasers, camera, slm_seq, dim):
+        cam_ind = camera + 3
+        digital_channels = lasers.copy()
+        digital_channels.append(cam_ind)
+        interval_samples = max(self.initial_samples, self.galvo_sw_settle_samples)
+        act_seq, cam_seq, self.exposure_time, self.exposure_samples = self.generate_slm_triggers(slm_seq)
+        dark_samples = int(act_seq.shape[0] / 2)
+        offset_samples = max(self.standby_samples - dark_samples, 0) + int(1e-3 * self.sample_rate)
+        if len(digital_channels) == 2:
+            cycle_samples = interval_samples + act_seq.shape[0] + offset_samples
+            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+            digital_trigger[0][interval_samples:interval_samples + act_seq.shape[0]] = act_seq
+            digital_trigger[1][interval_samples:interval_samples + cam_seq.shape[0]] = cam_seq
+            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+            switch_trigger[interval_samples:interval_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+        elif len(digital_channels) == 3:
+            expo_samples = self.digital_ends[lasers[0]] - self.digital_starts[lasers[0]]
+            interp_samples = max(interval_samples, expo_samples)
+            cycle_samples = interp_samples + act_seq.shape[0] + offset_samples
+            digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
+            digital_trigger[0][:expo_samples] = 1
+            digital_trigger[1][interp_samples:interp_samples + act_seq.shape[0]] = act_seq
+            digital_trigger[2][interp_samples:interp_samples + cam_seq.shape[0]] = cam_seq
+            switch_trigger = self.galvo_sw_states[2] * np.ones(cycle_samples, dtype=np.float16)
+            switch_trigger[interp_samples:interp_samples + cam_seq.shape[0]] = self.galvo_sw_states[camera]
+        else:
+            self.logg.error("Digital channels error.")
+            raise ValueError("Digital channels number is wrong.")
+        if dim == 2:
+            digital_trigger = np.tile(digital_trigger, (1, 3))
+            switch_trigger = np.tile(switch_trigger, 3)
+        elif dim == 3:
+            digital_trigger = np.tile(digital_trigger, (1, 5))
+            switch_trigger = np.tile(switch_trigger, 5)
+        else:
+            self.logg.error("SIM dimension error.")
+            raise ValueError("SIM dimension number is wrong.")
+        return digital_trigger, switch_trigger, digital_channels
+
     def generate_digital_triggers(self, lasers, camera, slm_seq):
         cam_ind = camera + 3
         digital_channels = lasers.copy()
@@ -220,6 +259,19 @@ class TriggerSequence:
                 raise ValueError("Digital channels number is wrong.")
         return digital_trigger, switch_trigger, digital_channels
 
+    def generate_sim_triggers_for_3d(self, lasers, camera, slm_seq):
+        digital_triggers, switch_trigger, chs = self.generate_sim_triggers(lasers, camera, slm_seq, 3)
+        if self.standby_samples > self.return_samples:
+            cycle_samples = digital_triggers.shape[1]
+        else:
+            compensate_samples = self.return_samples - self.standby_samples
+            cycle_samples = digital_triggers.shape[1] + compensate_samples
+            compensate_sequence = np.zeros((digital_triggers.shape[0], compensate_samples))
+            digital_triggers = np.concatenate((digital_triggers, compensate_sequence), axis=1)
+            compensate_sequence = switch_trigger[2] * np.ones(compensate_samples)
+            switch_trigger = np.concatenate((switch_trigger, compensate_sequence))
+        return digital_triggers, switch_trigger, cycle_samples, chs
+
     def generate_digital_triggers_for_scan(self, lasers, camera, slm_seq):
         digital_triggers, switch_trigger, chs = self.generate_digital_triggers(lasers, camera, slm_seq)
         if self.standby_samples > self.return_samples:
@@ -232,6 +284,27 @@ class TriggerSequence:
             compensate_sequence = switch_trigger[2] * np.ones(compensate_samples)
             switch_trigger = np.concatenate((switch_trigger, compensate_sequence))
         return digital_triggers, switch_trigger, cycle_samples, chs
+
+    def generate_sim_3d(self, lasers, camera, slm_seq):
+        digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_sim_triggers_for_3d(lasers, camera, slm_seq)
+        pos = 1
+        pz_chs = []
+        for i in range(3):
+            if self.piezo_scan_pos[i] > 0:
+                pos *= self.piezo_scan_pos[i]
+                pz_chs.append(i)
+        if len(pz_chs) == 0:
+            raise Exception("Error: zero piezo scan step")
+        piezo_sequences = [np.empty((0,)) for _ in range(len(pz_chs))]
+        for n, pch in enumerate(pz_chs):
+            piezo_sequences[n] = np.repeat(self.piezo_scan_positions[pch], digital_triggers.shape[1])
+            piezo_sequences[n] = shift_array(piezo_sequences[n], max(self.standby_samples, self.return_samples),
+                                             fill=piezo_sequences[n][0], direction="backward")
+            for i in range(n):
+                piezo_sequences[i] = np.tile(piezo_sequences[i], self.piezo_scan_pos[pch])
+            digital_triggers = np.tile(digital_triggers, self.piezo_scan_pos[pch])
+            switch_trigger = np.tile(switch_trigger, self.piezo_scan_pos[pch])
+        return digital_triggers, switch_trigger, convert_list(piezo_sequences), dig_chs, pz_chs, pos
 
     def generate_piezo_scan(self, lasers, camera, slm_seq):
         digital_triggers, switch_trigger, cycle_samples, dig_chs = self.generate_digital_triggers_for_scan(lasers, camera, slm_seq)
