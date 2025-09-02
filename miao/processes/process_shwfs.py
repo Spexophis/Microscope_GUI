@@ -19,17 +19,17 @@ class WavefrontSensing:
 
     def __init__(self, logg=None):
         self.logg = logg or self.setup_logging()
-        self.n_lenslets_x = 18
-        self.n_lenslets_y = 18
+        self.n_lenslets_x = 34
+        self.n_lenslets_y = 34
         self.n_lenslets = self.n_lenslets_x * self.n_lenslets_y
-        self.x_center_base = 1231
-        self.y_center_base = 926
-        self.x_center_offset = 1231
-        self.y_center_offset = 926
-        self.lenslet_spacing = 23  # spacing between each lenslet
+        self.x_center_base = 1074
+        self.y_center_base = 1039
+        self.x_center_offset = 1074
+        self.y_center_offset = 1039
+        self.lenslet_spacing = 47  # spacing between each lenslet
         self.hsp = 16  # size of subimage is 2 * hsp
         self.bg = 0.1
-        self.pixel_size = .0065  # mm
+        self.pixel_size = .00345  # mm
         self.calfactor = (self.pixel_size / 5.2) * 150  # pixel size * focalLength * pitch
         self.method = 'correlation'
         self.mag = 1
@@ -262,6 +262,7 @@ class WavefrontSensing:
         for filename in os.listdir(data_folder):
             if filename.endswith(".tif") & filename.startswith("actuator"):
                 ind = int(filename.split("_")[1])
+                print(ind)
                 if verbose:
                     self.logg.info(filename.split("_")[1])
                 data_stack = tf.imread(os.path.join(data_folder, filename))

@@ -131,7 +131,7 @@ class AOWidget(QtWidgets.QWidget):
     def _create_shwfs_widgets(self):
         layout_shwfs = QtWidgets.QHBoxLayout()
 
-        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["WebCam", "Thorlabs"])
+        self.QComboBox_wfs_camera_selection = cw.ComboBoxWidget(list_items=["Thorlabs", "WebCam"])
         self.QPushButton_foc_shwfs_base = cw.PushButtonWidget('SetBase', enable=True)
         self.QPushButton_run_foc_wfs = cw.PushButtonWidget('RunWFS', checkable=True)
         self.QPushButton_run_foc_wfr = cw.PushButtonWidget('RunWFR', enable=True)

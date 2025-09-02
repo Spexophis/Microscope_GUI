@@ -76,7 +76,7 @@ class TISCamera:
             self.pixels_x = 1024
             self.pixels_y = 1024
             self.img_size = self.pixels_x * self.pixels_y
-            self.ps = 13  # micron
+            self.ps = 3.45   # micron
             self.buffer_size = None
             self.acq_num = 0
             self.acq_first = 0

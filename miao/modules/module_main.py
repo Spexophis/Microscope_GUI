@@ -1,5 +1,5 @@
 from miao.modules import module_thorlabcam
-from miao.modules import module_thorlabwebcam
+from miao.modules import module_tis
 from miao.modules import module_coboltlaser
 from miao.modules import module_deformablemirror
 from miao.modules import module_board
@@ -17,8 +17,8 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.webcam = module_thorlabwebcam.ThorCam(logg=self.logg.error_log)
-            self.cam_set[1] = self.webcam
+            self.tiscam = module_tis.TISCamera(logg=self.logg.error_log)
+            self.cam_set[1] = self.tiscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
@@ -32,7 +32,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.uno = module_board.Boards(logg=self.logg.error_log, config=self.config)
+            self.nucleo = module_board.NucleoBoards(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")

@@ -5,7 +5,7 @@ import numpy as np
 import serial
 
 
-class Boards:
+class NucleoBoards:
 
     def __init__(self, logg=None, config=None):
         self.logg = logg or self.setup_logging()
@@ -17,16 +17,20 @@ class Boards:
         self.target = {
             'DAC1': 0,
             'DAC2': 1,
-            'PA0': 2,
-            'PA1': 3,
-            'PB10': 4,
-            "switch_on": 5,
-            "switch_off": 6,
-            "switch_off_clock": 7
+            "set_dac": 4,
+            "switch_on_inf": 5,
+            "switch_on_fin": 6,
+            "switch_off": 7,
+            'PA0': 0,
+            'PA1': 1,
+            'PB10': 2,
         }
+        self.infinity = False
 
         self.digital_length = 16000  # must match firmware
         self.signal_length = 16000  # must match firmware
+        self.ttl_sequences = []
+        self.analog_sequences = []
 
     @staticmethod
     def setup_logging():
@@ -42,6 +46,7 @@ class Boards:
         return cfg
 
     def close(self):
+        self.stop_triggers()
         self.ser_dig.close()
         self.ser_ang.close()
 
@@ -65,75 +70,82 @@ class Boards:
 
     def set_galvo_position(self, pos, indices=None):
         try:
-            self.send_sequence(self.ser_ang, 'DAC1', [pos[0]] * self.signal_length, is_dac=True)
-            time.sleep(5)
-            self.send_sequence(self.ser_ang, 'DAC2', [pos[1]] * self.signal_length, is_dac=True)
-            time.sleep(5)
+            pos = [p * 4096 / 3.3 for p in pos]
+            self.send_sequence(self.ser_ang, "set_dac", pos, is_dac=True)
         except RuntimeError as e:
             self.logg.error("GPIO channels writing error: %s", e)
 
     def write_digital_sequences(self, digital_sequences, indices=None):
         if isinstance(digital_sequences, np.ndarray):
             digital_sequences = digital_sequences.tolist()
-        try:
-            dfn = self.signal_length - len(digital_sequences[0])
-            if dfn > 0:
-                temp = [digital_sequences[0][-1]] * dfn
-                pa0 = digital_sequences[0]
-                pa0.extend(temp)
-            else:
-                pa0 = digital_sequences[0][:self.signal_length]
-            self.send_sequence(self.ser_dig, 'PA0', pa0, is_dac=False)
-            time.sleep(0.2)
-            dfn = self.signal_length - len(digital_sequences[1])
-            if dfn > 0:
-                temp = [digital_sequences[1][-1]] * dfn
-                pa1 = digital_sequences[1]
-                pa1.extend(temp)
-            else:
-                pa1 = digital_sequences[1][:self.signal_length]
-            self.send_sequence(self.ser_dig, 'PA1', pa1, is_dac=False)
-            time.sleep(0.2)
-            dfn = self.signal_length - len(digital_sequences[2])
-            if dfn > 0:
-                temp = [digital_sequences[2][-1]] * dfn
-                pb10 = digital_sequences[2]
-                pb10.extend(temp)
-            else:
-                pb10 = digital_sequences[2][:self.signal_length]
-            self.send_sequence(self.ser_dig, 'PB10', pb10, is_dac=False)
-            time.sleep(0.2)
-        except RuntimeError as e:
-            self.logg.error("GPIO channels writing error: %s", e)
+        if digital_sequences == self.ttl_sequences:
+            return
+        else:
+            try:
+                self.ttl_sequences = digital_sequences
+                dfn = self.signal_length - len(digital_sequences[0])
+                if dfn > 0:
+                    temp = [digital_sequences[0][-1]] * dfn
+                    pa0 = digital_sequences[0]
+                    pa0.extend(temp)
+                else:
+                    pa0 = digital_sequences[0][:self.signal_length]
+                self.send_sequence(self.ser_dig, 'PA0', pa0, is_dac=False)
+                time.sleep(0.2)
+                dfn = self.signal_length - len(digital_sequences[1])
+                if dfn > 0:
+                    temp = [digital_sequences[1][-1]] * dfn
+                    pa1 = digital_sequences[1]
+                    pa1.extend(temp)
+                else:
+                    pa1 = digital_sequences[1][:self.signal_length]
+                self.send_sequence(self.ser_dig, 'PA1', pa1, is_dac=False)
+                time.sleep(0.2)
+                dfn = self.signal_length - len(digital_sequences[2])
+                if dfn > 0:
+                    temp = [digital_sequences[2][-1]] * dfn
+                    pb10 = digital_sequences[2]
+                    pb10.extend(temp)
+                else:
+                    pb10 = digital_sequences[2][:self.signal_length]
+                self.send_sequence(self.ser_dig, 'PB10', pb10, is_dac=False)
+                time.sleep(0.2)
+            except RuntimeError as e:
+                self.logg.error("GPIO channels writing error: %s", e)
 
     def write_galvo_sequences(self, galvo_sequences, indices=None):
         if isinstance(galvo_sequences, np.ndarray):
             galvo_sequences = galvo_sequences * 4096 / 3.3
             galvo_sequences = galvo_sequences.astype(np.uint16)
             galvo_sequences = galvo_sequences.tolist()
-        try:
-            dfn = self.signal_length - len(galvo_sequences[0])
-            if dfn > 0:
-                temp = [galvo_sequences[0][-1]] * dfn
-                dac1 = galvo_sequences[0]
-                dac1.extend(temp)
-            else:
-                dac1 = galvo_sequences[0][:self.signal_length]
-            self.send_sequence(self.ser_ang, 'DAC1', dac1, is_dac=True)
-            time.sleep(5)
-            dfn = self.signal_length - len(galvo_sequences[1])
-            if dfn > 0:
-                temp = [galvo_sequences[1][-1]] * dfn
-                dac2 = galvo_sequences[1]
-                dac2.extend(temp)
-            else:
-                dac2 = galvo_sequences[1][:self.signal_length]
-            self.send_sequence(self.ser_ang, 'DAC2', dac2, is_dac=True)
-            time.sleep(5)
-        except RuntimeError as e:
-            self.logg.error("DAC channels writing error: %s", e)
+        if galvo_sequences == self.analog_sequences:
+            return
+        else:
+            try:
+                self.analog_sequences = galvo_sequences
+                dfn = self.signal_length - len(galvo_sequences[0])
+                if dfn > 0:
+                    temp = [galvo_sequences[0][-1]] * dfn
+                    dac1 = galvo_sequences[0]
+                    dac1.extend(temp)
+                else:
+                    dac1 = galvo_sequences[0][:self.signal_length]
+                self.send_sequence(self.ser_ang, 'DAC1', dac1, is_dac=True)
+                time.sleep(5)
+                dfn = self.signal_length - len(galvo_sequences[1])
+                if dfn > 0:
+                    temp = [galvo_sequences[1][-1]] * dfn
+                    dac2 = galvo_sequences[1]
+                    dac2.extend(temp)
+                else:
+                    dac2 = galvo_sequences[1][:self.signal_length]
+                self.send_sequence(self.ser_ang, 'DAC2', dac2, is_dac=True)
+                time.sleep(5)
+            except RuntimeError as e:
+                self.logg.error("DAC channels writing error: %s", e)
 
-    def write_triggers(self, galvo_sequences=None, galvo_channels=None, digital_sequences=None, digital_channels=None, finite=True):
+    def write_triggers(self, galvo_sequences=None, galvo_channels=None, digital_sequences=None, digital_channels=None, infinity=True):
+        self.infinity = infinity
         try:
             if digital_sequences is not None:
                 self.write_digital_sequences(digital_sequences, indices=digital_channels)
@@ -143,7 +155,14 @@ class Boards:
             self.logg.error("Sequence writing error: %s", e)
 
     def run_triggers(self):
-        self.send_sequence(self.ser_ang, 'switch_on', [0,0], is_dac=False)
+        if self.infinity:
+            self.send_sequence(self.ser_ang, 'switch_on_inf', [0,0], is_dac=False)
+        else:
+            self.send_sequence(self.ser_ang, 'switch_on_fin', [0, 0], is_dac=False)
 
     def stop_triggers(self):
         self.send_sequence(self.ser_ang, 'switch_off', [0,0], is_dac=False)
+
+
+def same_list(lst):
+    return len(set(lst)) == 1 if lst else True

@@ -14,7 +14,7 @@ from miao.tools import tool_zernike as tz
 
 
 class MainController(QtCore.QObject):
-    sada = QtCore.pyqtSignal(str, np.ndarray, list, list)
+    sada = QtCore.pyqtSignal(str, np.ndarray, list)
     sazf = QtCore.pyqtSignal(list, np.ndarray)
     sig_plt = QtCore.pyqtSignal(list, list)
 
@@ -30,16 +30,24 @@ class MainController(QtCore.QObject):
         self.view_controller = controller_view.ViewController(self.v.view_view)
         self.con_controller = controller_con.ConController(self.v.con_view)
         self.ao_controller = controller_ao.AOController(self.v.ao_view)
-        self._setup_threads()
         self._set_signal_connections()
         self._initial_setup()
         self.lasers = []
         self.cameras = {"imaging": 0, "wfs": 1}
         # dedicated thread pool for tasks
         self.task_worker = None
-        self.task_thread = QtCore.QThread()
+        self.task_thread = None
+        self.loop_flag = False
+        self.videoWorker = None
+        self.thread_video = None
+        self.fftWorker = None
+        self.thread_fft = None
+        self.plotWorker = None
+        self.thread_plot = None
+        self.wfsWorker = None
+        self.thread_wfs = None
 
-    def _setup_threads(self):
+    def setup_video_thread(self):
         # video thread
         self.videoWorker = LoopWorker(dt=100)
         self.videoWorker.signal_loop.connect(self.imshow_main)
@@ -47,6 +55,8 @@ class MainController(QtCore.QObject):
         self.videoWorker.moveToThread(self.thread_video)
         self.thread_video.started.connect(self.videoWorker.start)
         self.thread_video.finished.connect(self.videoWorker.stop)
+
+    def setup_fft_thread(self):
         # image process thread
         self.fftWorker = LoopWorker(dt=250)
         self.fftWorker.signal_loop.connect(self.imshow_fft)
@@ -54,6 +64,8 @@ class MainController(QtCore.QObject):
         self.fftWorker.moveToThread(self.thread_fft)
         self.thread_fft.started.connect(self.fftWorker.start)
         self.thread_fft.finished.connect(self.fftWorker.stop)
+
+    def setup_plot_thread(self):
         # plot thread
         self.plotWorker = LoopWorker(dt=250)
         self.plotWorker.signal_loop.connect(self.profile_plot)
@@ -61,6 +73,8 @@ class MainController(QtCore.QObject):
         self.plotWorker.moveToThread(self.thread_plot)
         self.thread_plot.started.connect(self.plotWorker.start)
         self.thread_plot.finished.connect(self.plotWorker.stop)
+
+    def setup_wfs_thread(self):
         # wavefront sensor thread
         self.wfsWorker = LoopWorker(dt=125)
         self.wfsWorker.signal_loop.connect(self.imshow_img_wfs)
@@ -87,8 +101,8 @@ class MainController(QtCore.QObject):
         self.v.con_view.Signal_add_profile.connect(self.plot_add)
         self.v.con_view.Signal_set_mask.connect(self.set_array_mask)
         # NUCLEO
-        self.v.con_view.Signal_nucleo_update.connect(self.update_nucleo)
-        self.v.con_view.Signal_nucleo_reset.connect(self.reset_nucleo)
+        # self.v.con_view.Signal_nucleo_update.connect(self.update_nucleo)
+        self.v.con_view.Signal_nucleo_send.connect(self.send_nucleo)
         # Main Data Recording
         self.v.con_view.Signal_data_acquire.connect(self.data_acquisition)
         # DM
@@ -119,12 +133,12 @@ class MainController(QtCore.QObject):
 
             self.loop_flag = True
 
-            # self.reset_galvo_positions()
-            # self.update_galvo_scanner()
+            self.reset_galvo_positions()
+            self.update_galvo_scanner()
 
             self.laser_lists = ["405", "488"]
 
-            self.pixel_sizes = [0., 0.]
+            self.pixel_sizes = [0.02738, 3.45]
 
             self.dm_cmd_ind = self.m.dm.current_cmd
             self.dfm = self.m.dm
@@ -207,21 +221,109 @@ class MainController(QtCore.QObject):
     def set_camera_roi(self, key="imaging"):
         try:
             if self.cameras[key] == 0:
-                x, y, nx, ny, bx, by = self.con_controller.get_thorcam_roi()
+                x, y, nx, ny, bn = self.con_controller.get_thorcam_roi()
                 self.m.cam_set[self.cameras[key]].set_roi(x, y, x + nx - 1, y + ny - 1)
             if self.cameras[key] == 1:
-                x, y, nx, ny, bx, by = self.con_controller.get_webcam_roi()
+                expo = self.con_controller.get_webcam_expo()
+                self.m.cam_set[self.cameras[key]].set_exposure(expo)
+                x, y, nx, ny, bn = self.con_controller.get_webcam_roi()
                 self.m.cam_set[self.cameras[key]].set_roi(x, y, nx, ny)
         except Exception as e:
             self.logg.error(f"Camera Error: {e}")
 
-    @QtCore.pyqtSlot()
-    def update_nucleo(self):
-        self.update_galvo_scanner()
+    # @QtCore.pyqtSlot()
+    # def update_nucleo(self, sample_rate):
+    #     self.update_galvo_scanner()
 
-    @QtCore.pyqtSlot()
-    def reset_nucleo(self):
-        self.m.nucleo.stop_triggers()
+    @QtCore.pyqtSlot(str)
+    def send_nucleo(self, mod: str):
+        self.v.get_dialog()
+        if mod == "video":
+            self.run_task(task=self.send_nucleo_video)
+        elif mod == "acquire":
+            self.run_task(task=self.send_nucleo_acquisition)
+        elif mod == "ao":
+            self.run_task(task=self.send_nucleo_ao)
+        else:
+            raise ValueError("Invalid sequence mode")
+
+    def send_nucleo_video(self):
+        self.lasers = [0, 1]
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.update_trigger_parameters("imaging")
+        vd_mod = self.con_controller.get_live_mode()
+        if vd_mod == "Wide Field":
+            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
+            rpn = self.m.nucleo.signal_length // dtr.shape[1]
+            if rpn > 1:
+                dtr = np.tile(dtr, (1, rpn))
+            g_x, g_y = self.con_controller.get_galvo_positions()
+            gtr = np.ones((2, self.m.nucleo.signal_length))
+            gtr[0] = gtr[0] * g_x
+            gtr[1] = gtr[1] * g_y
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=True)
+        elif vd_mod == "Dot Scan":
+            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
+            x = np.zeros((1, dtr.shape[1]))
+            dtr = np.vstack((x, dtr))
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=True)
+        else:
+            raise ValueError("Invalid video mode")
+
+    def send_nucleo_acquisition(self):
+        self.lasers = [0, 1]
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.update_trigger_parameters("imaging")
+        acq_mod = self.con_controller.get_acquisition_mode()
+        if "Wide Field" in acq_mod:
+            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
+            rpn = self.m.nucleo.signal_length // dtr.shape[1]
+            self.m.cam_set[self.cameras["imaging"]].acq_num = rpn
+            if rpn > 1:
+                dtr = np.tile(dtr, (1, rpn))
+            g_x, g_y = self.con_controller.get_galvo_positions()
+            gtr = np.ones((2, self.m.nucleo.signal_length))
+            gtr[0] = gtr[0] * g_x
+            gtr[1] = gtr[1] * g_y
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+        elif "Dot Scan" in acq_mod:
+            self.m.cam_set[self.cameras["imaging"]].acq_num = 1
+            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
+            x = np.zeros((1, dtr.shape[1]))
+            dtr = np.vstack((x, dtr))
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+        else:
+            raise ValueError("Invalid acquisition mode")
+
+    def send_nucleo_ao(self):
+        self.lasers = [0, 1]
+        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.update_trigger_parameters("imaging")
+        vd_mod = self.con_controller.get_live_mode()
+        if vd_mod == "Wide Field":
+            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
+            rpn = self.m.nucleo.signal_length // dtr.shape[1]
+            if rpn > 1:
+                dtr = np.pad(dtr, ((0, 0), (0, dtr.shape[1] * (rpn - 1))), 'constant', constant_values=((0, 0), (0, 0)))
+            g_x, g_y = self.con_controller.get_galvo_positions()
+            gtr = np.ones((2, self.m.nucleo.signal_length))
+            gtr[0] = gtr[0] * g_x
+            gtr[1] = gtr[1] * g_y
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+        elif vd_mod == "Dot Scan":
+            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
+            x = np.zeros((1, dtr.shape[1]))
+            dtr = np.vstack((x, dtr))
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+        else:
+            raise ValueError("Invalid video mode")
+
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
@@ -246,26 +348,15 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters(cam_key)
         return self.p.trigger.generate_digital_triggers(self.lasers, self.cameras[cam_key])
 
-    def prepare_video(self, vd_mod):
-        self.lasers = self.con_controller.get_lasers()
+    def prepare_video(self):
         self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        self.update_trigger_parameters("imaging")
-        if vd_mod == "Wide Field":
-            dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
-            self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
-        if vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                      digital_sequences=dtr, digital_channels=chs, finite=False)
-        if vd_mod == "Focus Lock":
-            self.logg.info(f"Focus Lock live")
+        self.setup_video_thread()
 
     def start_video(self, vm):
         try:
-            self.prepare_video(vm)
+            self.prepare_video()
         except Exception as e:
             self.logg.error(f"Error preparing imaging video: {e}")
             self.m.nucleo.stop_triggers()
@@ -273,8 +364,7 @@ class MainController(QtCore.QObject):
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_live()
-            if self.cameras["imaging"] != self.cameras["focus_lock"]:
-                self.m.nucleo.run_triggers()
+            self.m.nucleo.run_triggers()
             self.thread_video.start()
         except Exception as e:
             self.logg.error(f"Error starting imaging video: {e}")
@@ -318,6 +408,7 @@ class MainController(QtCore.QObject):
 
     def run_fft(self):
         try:
+            self.setup_fft_thread()
             self.thread_fft.start()
         except Exception as e:
             self.logg.error(f"Error starting fft: {e}")
@@ -347,6 +438,7 @@ class MainController(QtCore.QObject):
 
     def start_plot_live(self):
         try:
+            self.setup_plot_thread()
             self.thread_plot.start()
         except Exception as e:
             self.logg.error(f"Error starting plot: {e}")
@@ -380,7 +472,7 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def plot_trigger(self):
         try:
-            dtr, sw, dch = self.generate_live_triggers("imaging")
+            dtr, dch = self.generate_live_triggers("imaging")
             self.view_controller.plot_update(dtr[0])
             for i in range(dtr.shape[0] - 1):
                 self.view_controller.plot(dtr[i + 1] + i + 1)
@@ -408,8 +500,8 @@ class MainController(QtCore.QObject):
         else:
             self.logg.error(f"Invalid video mode")
 
-    @QtCore.pyqtSlot(str, np.ndarray, list, list)
-    def save_data(self, tm: str, d: np.ndarray, idx: list, pos: list):
+    @QtCore.pyqtSlot(str, np.ndarray, list)
+    def save_data(self, tm: str, d: np.ndarray, idx: list):
         fn = self.v.get_file_dialog()
         if fn is not None:
             fd = os.path.join(self.data_folder, tm + '_' + fn)
@@ -421,23 +513,19 @@ class MainController(QtCore.QObject):
             if idx is not None:
                 df_idx = pd.DataFrame(idx, columns=["acquisition_sequence"])
                 df_idx.to_excel(writer, sheet_name="acquisition_sequence", index=False)
-            if pos is not None:
-                for i, arr in enumerate(pos):
-                    df_pos = pd.DataFrame(arr, columns=[f"axis_{i}"])
-                    df_pos.to_excel(writer, sheet_name=f"axis_{i}", index=False)
 
     def prepare_widefield(self):
-        self.lasers = self.con_controller.get_lasers()
+        # self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
-        self.m.nucleo.set_piezo_position(pos=[ptr[0]], indices=[2])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=pch, digital_sequences=dtr, digital_channels=dch,
-                                  finite=True)
+        # self.update_trigger_parameters("imaging")
+        # dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+        # self.m.nucleo.set_piezo_position(pos=[ptr[0]], indices=[2])
+        # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+        #                              digital_sequences=dtr, digital_channels=dch, infinity=False)
 
     def widefield(self):
         try:
@@ -448,11 +536,11 @@ class MainController(QtCore.QObject):
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             self.m.nucleo.run_triggers()
-            time.sleep(0.2)
+            time.sleep(1 + self.m.nucleo.signal_length * 10 / 1e6)
+            self.dm_cmd_ind = self.m.dm.current_cmd
             self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack',
                            self.m.cam_set[self.cameras["imaging"]].get_data(),
-                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
-                           self.p.trigger.piezo_scan_positions)
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
         except Exception as e:
             self.finish_widefield()
             self.logg.error(f"Error running widefield zstack: {e}")
@@ -472,65 +560,18 @@ class MainController(QtCore.QObject):
         self.v.get_dialog()
         self.run_task(task=self.widefield, iteration=n)
 
-    def prepare_point_scan(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        ptr, sw, dtr, dch, pch, gch, pos = self.p.trigger.generate_piezo_point_scan_2d(self.lasers,
-                                                                                       self.cameras["imaging"])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
-                                  digital_sequences=dtr, digital_channels=dch)
-
-    def point_scan(self):
-        try:
-            self.prepare_point_scan()
-        except Exception as e:
-            self.logg.error(f"Error preparing point scanning: {e}")
-            return
-        try:
-            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-            time.sleep(0.02)
-            self.m.nucleo.run_triggers()
-            time.sleep(1.)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_piezo_scanning.tif')
-            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)})
-        except Exception as e:
-            self.finish_point_scan()
-            self.logg.error(f"Error running point scanning: {e}")
-            return
-        self.finish_point_scan()
-
-    def finish_point_scan(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
-            self.m.nucleo.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Point scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping point scanning: {e}")
-
-    def run_point_scan(self, n: int):
-        self.v.get_dialog()
-        self.run_task(task=self.point_scan, iteration=n)
-
     def prepare_dot_scan(self):
-        self.lasers = self.con_controller.get_lasers()
+        # self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
-        self.update_trigger_parameters("imaging")
-        gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotscan_resolft_2d(self.lasers, self.cameras["imaging"])
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
-        self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
-                                  galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                  digital_sequences=dtr, digital_channels=chs)
+        # self.update_trigger_parameters("imaging")
+        # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
+        # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
+        #                           galvo_sequences=gtr, galvo_channels=[0, 1, 2],
+        #                           digital_sequences=dtr, digital_channels=chs)
 
     def dot_scan(self):
         try:
@@ -542,13 +583,11 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             time.sleep(0.02)
             self.m.nucleo.run_triggers()
-            time.sleep(1.)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_dot_scanning.tif')
+            time.sleep(1 + self.m.nucleo.signal_length * 10 / 1e6)
             self.dm_cmd_ind = self.m.dm.current_cmd
-            tf.imwrite(fd, self.m.cam_set[self.cameras["imaging"]].get_data(), imagej=True, resolution=(
-                1 / self.pixel_sizes[self.cameras["imaging"]], 1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um', 'indices': list(self.m.cam_set[self.cameras["imaging"]].data.ind_list),
-                                 'DM cmd': self.dm_cmd_ind})
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_dot_scanning',
+                           self.m.cam_set[self.cameras["imaging"]].get_data(),
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
         except Exception as e:
             self.finish_dot_scan()
             self.logg.error(f"Error running dot scanning: {e}")
@@ -567,72 +606,6 @@ class MainController(QtCore.QObject):
     def run_dot_scan(self, n: int):
         self.v.get_dialog()
         self.run_task(task=self.dot_scan, iteration=n)
-
-    def prepare_focal_array_scan(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
-        self.cameras["imaging"] = self.con_controller.get_imaging_camera()
-        self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        self.update_trigger_parameters("imaging")
-
-    def focal_array_scan(self):
-        try:
-            self.prepare_focal_array_scan()
-        except Exception as e:
-            self.logg.error(f"Error preparing focal array scanning: {e}")
-            return
-        try:
-            scan_x = self.p.trigger.galvo_origins[0] + np.linspace(-1.2 * self.p.trigger.dot_step_v,
-                                                                   1.2 * self.p.trigger.dot_step_v, 10,
-                                                                   endpoint=False, dtype=float)
-            scan_y = self.p.trigger.galvo_origins[1] + np.linspace(-1.2 * self.p.trigger.dot_step_y,
-                                                                   1.2 * self.p.trigger.dot_step_y, 10,
-                                                                   endpoint=False, dtype=float)
-            sx, sy = scan_x.shape[0], scan_y.shape[0]
-            data = []
-            mx = np.zeros((sy, sx))
-            self.m.cam_set[self.cameras["imaging"]].start_live()
-            time.sleep(0.2)
-            for j in range(sy):
-                for i in range(sx):
-                    self.p.trigger.update_galvo_scan_parameters(origins=[scan_x[i], scan_y[j]])
-                    dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers,
-                                                                                      self.cameras["imaging"])
-                    self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                              digital_sequences=dtr, digital_channels=chs)
-                    self.m.nucleo.run_triggers()
-                    time.sleep(0.2)
-                    temp = self.m.cam_set[self.cameras["imaging"]].get_last_image()
-                    self.m.nucleo.stop_triggers()
-                    data.append(temp)
-                    mx[j, i] = np.mean(temp)
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_focal_array_scan.tif')
-            tf.imwrite(fd, np.asarray(data), imagej=True,
-                       resolution=(1 / self.pixel_sizes[self.cameras["imaging"]],
-                                   1 / self.pixel_sizes[self.cameras["imaging"]]),
-                       metadata={'unit': 'um'})
-            fd = os.path.join(self.data_folder, time.strftime("%Y%m%d%H%M%S") + '_focal_array_scan_recon.tif')
-            tf.imwrite(fd, mx)
-            self.v.view_view.plot_image(data=mx, axis_arrays=[scan_x, scan_y], axis_labels=None)
-        except Exception as e:
-            self.finish_focal_array_scan()
-            self.logg.error(f"Error running focal array scanning: {e}")
-            return
-        self.finish_focal_array_scan()
-
-    def finish_focal_array_scan(self):
-        try:
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.m.nucleo.stop_triggers()
-            self.lasers_off()
-            self.logg.info("Focal array scanning image acquired")
-        except Exception as e:
-            self.logg.error(f"Error stopping focal array scanning: {e}")
-
-    def run_focal_array_scan(self):
-        self.v.get_dialog()
-        self.run_task(task=self.focal_array_scan)
 
     @QtCore.pyqtSlot(int, float)
     def push_actuator(self, n: int, a: float):
@@ -708,15 +681,16 @@ class MainController(QtCore.QObject):
         self.logg.info('SHWFS parameter updated')
 
     def prepare_img_wfs(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
+        # self.lasers = self.con_controller.get_lasers()
+        # self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
-        self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs(self.cameras["wfs"])
-        self.update_trigger_parameters("wfs")
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
-        self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
+        self.m.cam_set[self.cameras["wfs"]].prepare_live()
+        # self.update_trigger_parameters("wfs")
+        # dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        # self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=False)
+        self.setup_wfs_thread()
 
     def start_img_wfs(self):
         try:
@@ -725,8 +699,10 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error preparing wfs: {e}")
             self.stop_img_wfs()
         try:
+            pw = self.con_controller.get_cobolt_laser_power("488")
             self.m.cam_set[self.cameras["wfs"]].start_live()
-            self.m.nucleo.run_triggers()
+            self.set_laser(["488"], 1, pw[0])
+            # self.m.nucleo.run_triggers()
             self.thread_wfs.start()
         except Exception as e:
             self.logg.error(f"Error starting wfs: {e}")
@@ -738,9 +714,9 @@ class MainController(QtCore.QObject):
             if self.thread_wfs.isRunning():
                 self.thread_wfs.quit()
                 self.thread_wfs.wait()
-            self.m.cam_set[self.cameras["wfs"]].stop_live()
-            self.m.nucleo.stop_triggers()
+            # self.m.nucleo.stop_triggers()
             self.lasers_off()
+            self.m.cam_set[self.cameras["wfs"]].stop_live()
         except Exception as e:
             self.logg.error(f"Error stopping wfs: {e}")
 
@@ -818,16 +794,23 @@ class MainController(QtCore.QObject):
         self.p.shwfsr.save_wfs_results(file_name, self.dfm)
 
     def prepare_influence_function(self):
-        self.lasers = self.con_controller.get_lasers()
-        self.set_lasers(self.lasers)
+        # self.lasers = self.con_controller.get_lasers()
+        # self.set_lasers(self.lasers)
         self.cameras["wfs"] = self.ao_controller.get_wfs_camera()
         self.set_camera_roi("wfs")
         self.m.cam_set[self.cameras["wfs"]].prepare_live()
         self.set_img_wfs(self.cameras["wfs"])
-        self.update_trigger_parameters("wfs")
-        wfs = self.ao_controller.get_dm_selection()
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
-        self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs)
+        # self.update_trigger_parameters("wfs")
+        # wfs = self.ao_controller.get_dm_selection()
+        # dtr, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        # self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs)
+
+    def read_tis_image(self, n):
+        m = self.m.cam_set[self.cameras["wfs"]].data.image_counter
+        while m == n:
+            m = self.m.cam_set[self.cameras["wfs"]].data.image_counter
+        dat = self.m.cam_set[self.cameras["wfs"]].get_last_image()
+        return dat, m
 
     def influence_function(self):
         try:
@@ -847,38 +830,44 @@ class MainController(QtCore.QObject):
         try:
             n, amp = self.ao_controller.get_actuator()
             self.m.cam_set[self.cameras["wfs"]].start_live()
-            time.sleep(0.02)
+            pw = self.con_controller.get_cobolt_laser_power("488")
+            self.set_laser(["488"], 1, pw[0])
+            num = self.m.cam_set[self.cameras["wfs"]].data.image_counter
             for i in range(self.dfm.n_actuator):
                 shimg = []
                 self.v.dialog_text.setText(f"actuator {i}")
                 values = [0.] * self.dfm.n_actuator
                 self.dfm.set_dm(values)
-                time.sleep(0.02)
-                self.m.nucleo.run_triggers()
-                time.sleep(0.08)
-                shimg.append(self.m.cam_set[self.cameras["wfs"]].get_last_image())
-                self.m.nucleo.stop_triggers(_close=False)
+                time.sleep(0.2)
+                # self.m.nucleo.run_triggers()
+                # time.sleep(0.08)
+                dat, num = self.read_tis_image(num)
+                shimg.append(dat)
+                # self.m.nucleo.stop_triggers(_close=False)
                 values[i] = amp
                 self.dfm.set_dm(values)
-                time.sleep(0.02)
-                self.m.nucleo.run_triggers()
-                time.sleep(0.08)
-                shimg.append(self.m.cam_set[self.cameras["wfs"]].get_last_image())
-                self.m.nucleo.stop_triggers(_close=False)
+                time.sleep(0.2)
+                # self.m.nucleo.run_triggers()
+                # time.sleep(0.08)
+                dat, num = self.read_tis_image(num)
+                shimg.append(dat)
+                # self.m.nucleo.stop_triggers(_close=False)
                 values = [0.] * self.dfm.n_actuator
                 self.dfm.set_dm(values)
-                time.sleep(0.02)
-                self.m.nucleo.run_triggers()
-                time.sleep(0.08)
-                shimg.append(self.m.cam_set[self.cameras["wfs"]].get_last_image())
-                self.m.nucleo.stop_triggers(_close=False)
+                time.sleep(0.2)
+                # self.m.nucleo.run_triggers()
+                # time.sleep(0.08)
+                dat, num = self.read_tis_image(num)
+                shimg.append(dat)
+                # self.m.nucleo.stop_triggers(_close=False)
                 values[i] = - amp
                 self.dfm.set_dm(values)
-                time.sleep(0.02)
-                self.m.nucleo.run_triggers()
-                time.sleep(0.08)
-                shimg.append(self.m.cam_set[self.cameras["wfs"]].get_last_image())
-                self.m.nucleo.stop_triggers(_close=False)
+                time.sleep(0.2)
+                # self.m.nucleo.run_triggers()
+                # time.sleep(0.08)
+                dat, num = self.read_tis_image(num)
+                shimg.append(dat)
+                # self.m.nucleo.stop_triggers(_close=False)
                 tf.imwrite(fd + r'/' + 'actuator_' + str(i) + '_push_' + str(amp) + '.tif', np.asarray(shimg))
         except Exception as e:
             self.logg.error(f"Error running influence function: {e}")
@@ -886,7 +875,7 @@ class MainController(QtCore.QObject):
             return
         try:
             self.v.dialog_text.setText(f"computing influence function")
-            dmn = self.v.ao_view.QComboBox_dms.currentText()
+            # dmn = self.v.ao_view.QComboBox_dms.currentText()
             self.p.shwfsr.generate_influence_matrices(data_folder=fd, dm=self.dfm, sv=self.config)
         except Exception as e:
             self.logg.error(f"Error computing influence function: {e}")
@@ -898,7 +887,7 @@ class MainController(QtCore.QObject):
         try:
             self.lasers_off()
             self.m.cam_set[self.cameras["wfs"]].stop_live()
-            self.m.nucleo.stop_triggers()
+            # self.m.nucleo.stop_triggers()
         except Exception as e:
             self.logg.error(f"Error finishing influence function: {e}")
 
@@ -972,25 +961,30 @@ class MainController(QtCore.QObject):
         self.view_controller.plot_msk(data=m)
 
     def prepare_sensorless_iteration(self):
-        vd_mod = self.con_controller.get_live_mode()
-        self.lasers = self.con_controller.get_lasers()
+        self.lasers = [0, 1]
         self.set_lasers(self.lasers)
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
+        self.update_trigger_parameters("imaging")
+        vd_mod = self.con_controller.get_live_mode()
         if vd_mod == "Wide Field":
-            dtr, sw, dch = self.generate_live_triggers("imaging")
-            self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=dch)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                       clean=self.p.trigger.initial_time,
-                                                       standby=self.p.trigger.standby_time)
+            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
+            rpn = self.m.nucleo.signal_length // dtr.shape[1]
+            if rpn > 1:
+                dtr = np.pad(dtr, ((0, 0), (0, dtr.shape[1] * (rpn - 1))), 'constant', constant_values=((0, 0), (0, 0)))
+            g_x, g_y = self.con_controller.get_galvo_positions()
+            gtr = np.ones((2, self.m.nucleo.signal_length))
+            gtr[0] = gtr[0] * g_x
+            gtr[1] = gtr[1] * g_y
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
         elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers(self.lasers, self.cameras["imaging"])
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1, 2],
-                                      digital_sequences=dtr, digital_channels=chs)
-            self.con_controller.display_camera_timings(exposure=self.p.trigger.exposure_time,
-                                                       clean=self.p.trigger.initial_time,
-                                                       standby=self.p.trigger.standby_time)
+            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
+            x = np.zeros((1, dtr.shape[1]))
+            dtr = np.vstack((x, dtr))
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
         else:
             self.m.cam_set[self.cameras["imaging"]].stop_live()
             self.lasers_off()
@@ -1002,8 +996,7 @@ class MainController(QtCore.QObject):
             self.dfm.set_dm(dmsp)
             time.sleep(0.016)
             self.m.nucleo.run_triggers()
-            time.sleep(0.032)
-            self.m.nucleo.stop_triggers(_close=False)
+            time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
             ims.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
         return ims
 
@@ -1018,11 +1011,6 @@ class MainController(QtCore.QObject):
             self.logg.info(f'Directory {new_folder} has been created successfully.')
         except Exception as e:
             self.logg.error(f'Error creating directory for sensorless iteration: {e}')
-            return
-        try:
-            self.prepare_sensorless_iteration()
-        except Exception as e:
-            self.logg.error(f"Prepare sensorless iteration Error: {e}")
             return
         try:
             mode_start, mode_stop, amp_start, amp_step, amp_step_number = self.ao_controller.get_ao_iteration()
@@ -1042,8 +1030,7 @@ class MainController(QtCore.QObject):
                 images = []
                 for i in range(8):
                     self.m.nucleo.run_triggers()
-                    time.sleep(0.032)
-                    self.m.nucleo.stop_triggers(_close=False)
+                    time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
                     images.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
                 if mf == "Max(Intensity)":
                     mts = [img.max() for img in images]
@@ -1062,8 +1049,7 @@ class MainController(QtCore.QObject):
                 tf.imwrite(str(fn), np.asarray(images))
             else:
                 self.m.nucleo.run_triggers()
-                time.sleep(0.032)
-                self.m.nucleo.stop_triggers(_close=False)
+                time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
                 fn = new_folder + r"\original.tiff"
                 tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             for mode in range(mode_start, mode_stop + 1):
@@ -1108,8 +1094,7 @@ class MainController(QtCore.QObject):
             self.dfm.set_dm(cmd)
             time.sleep(0.016)
             self.m.nucleo.run_triggers()
-            time.sleep(0.032)
-            self.m.nucleo.stop_triggers(_close=False)
+            time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
             fn = new_folder + r"\final.tiff"
             tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             self.dfm.dm_cmd.append(cmd)
@@ -1136,6 +1121,11 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def run_sensorless_iteration(self):
         self.v.get_dialog()
+        try:
+            self.prepare_sensorless_iteration()
+        except Exception as e:
+            self.logg.error(f"Prepare sensorless iteration Error: {e}")
+            return
         self.run_task(task=self.sensorless_iterations)
 
     def sensorless_metric_acquisition(self):

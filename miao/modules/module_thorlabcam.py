@@ -147,15 +147,15 @@ class ThorCMOS:
         self.acq_thread.stop()
         self.acq_thread = None
 
-    def prepare_acquisition(self, n):
-        self.data = DataList(n)
+    def prepare_data_acquisition(self):
+        self.data = DataList(self.acq_num)
         self.acq_thread = AcquisitionThread(self)
 
-    def start_acquisition(self):
+    def start_data_acquisition(self):
         self.camera.arm(4)
         self.acq_thread.start()
 
-    def stop_acquisition(self):
+    def stop_data_acquisition(self):
         self.camera.disarm()
         self.acq_thread.stop()
         self.acq_thread = None
@@ -171,6 +171,12 @@ class ThorCMOS:
     def get_last_image(self):
         if self.data is not None:
             return self.data.get_last_element()
+        else:
+            return None
+
+    def get_data(self):
+        if self.data is not None:
+            return self.data.get_elements()
         else:
             return None
 

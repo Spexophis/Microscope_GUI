@@ -21,7 +21,7 @@ else:
 
 class DeformableMirror:
 
-    def __init__(self, name="ALPAO DM97", logg=None, config=None, path=None):
+    def __init__(self, name="ALPAO DM69", logg=None, config=None, path=None):
         self.dtp = path
         self.logg = logg or self.setup_logging()
         self.config = config or self.load_configs()

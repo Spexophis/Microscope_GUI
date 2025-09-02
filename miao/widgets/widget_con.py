@@ -12,8 +12,8 @@ class ConWidget(QtWidgets.QWidget):
     Signal_galvo_set = QtCore.pyqtSignal(float, float)
     Signal_galvo_scan_update = QtCore.pyqtSignal()
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
-    Signal_nucleo_update = QtCore.pyqtSignal(int)
-    Signal_nucleo_reset = QtCore.pyqtSignal()
+    # Signal_nucleo_update = QtCore.pyqtSignal(int)
+    Signal_nucleo_send = QtCore.pyqtSignal(str)
     Signal_plot_trigger = QtCore.pyqtSignal()
     Signal_focus_finding = QtCore.pyqtSignal()
     Signal_video = QtCore.pyqtSignal(bool, str)
@@ -221,7 +221,8 @@ class ConWidget(QtWidgets.QWidget):
 
         self.QSpinBox_daq_sample_rate = cw.SpinBoxWidget(100, 1250, 1, 250)
         self.QPushButton_plot_trigger = cw.PushButtonWidget("Plot Triggers")
-        self.QPushButton_reset_daq = cw.PushButtonWidget("Reset")
+        self.QComboBox_send_trigger = cw.ComboBoxWidget(list_items=["video", "acquire", "ao"])
+        self.QPushButton_send_trigger = cw.PushButtonWidget("Send Triggers")
         self.QDoubleSpinBox_ttl_start_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
         self.QDoubleSpinBox_ttl_stop_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
         self.QDoubleSpinBox_ttl_start_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
@@ -248,15 +249,16 @@ class ConWidget(QtWidgets.QWidget):
         layout_daq.addWidget(cw.FrameWidget(), 3, 1, 1, 5)
         layout_daq.addWidget(cw.LabelWidget(str('Sample Rate / KS/s')), 4, 1, 1, 1)
         layout_daq.addWidget(self.QSpinBox_daq_sample_rate, 4, 2, 1, 1)
-        layout_daq.addWidget(self.QPushButton_reset_daq, 4, 3, 1, 1)
-        layout_daq.addWidget(self.QPushButton_plot_trigger, 4, 4, 1, 1)
+        layout_daq.addWidget(self.QPushButton_plot_trigger, 4, 3, 1, 1)
+        layout_daq.addWidget(self.QComboBox_send_trigger, 4, 4, 1, 1)
+        layout_daq.addWidget(self.QPushButton_send_trigger, 4, 5, 1, 1)
         return layout_daq
 
     def _create_video_widgets(self):
         layout_video = QtWidgets.QGridLayout()
 
         self.QComboBox_imaging_camera_selection = cw.ComboBoxWidget(list_items=["Thorlabs", "WebCam"])
-        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Dot Scan", "Focus Lock", "Scan Calib"])
+        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Dot Scan"])
         self.QPushButton_video = cw.PushButtonWidget("Video", checkable=True)
         self.QPushButton_fft = cw.PushButtonWidget("FFT", checkable=True, enable=False)
         self.QComboBox_profile_axis = cw.ComboBoxWidget(list_items=["X", "Y"])
@@ -279,8 +281,7 @@ class ConWidget(QtWidgets.QWidget):
     def _create_acquisition_widgets(self):
         layout_acquisition = QtWidgets.QGridLayout()
 
-        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Dot Scan 2D",
-                                                                          "Point Scan 2D", "FocArr Scan 2D"])
+        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Dot Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)
         self.QPushButton_acquire = cw.PushButtonWidget('Acquire')
         self.QPushButton_save_acquisition_timing_presets = cw.PushButtonWidget("Save AcqTTLs")
@@ -306,9 +307,9 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_save_new_galvo_scan_preset.clicked.connect(self.create_new_galvo_preset)
         self.QPushButton_laser_488.clicked.connect(self.set_laser_488)
         self.QPushButton_laser_405.clicked.connect(self.set_laser_405)
-        self.QSpinBox_daq_sample_rate.valueChanged.connect(self.update_daq)
-        self.QPushButton_reset_daq.clicked.connect(self.reset_daq)
-        self.QPushButton_plot_trigger.clicked.connect(self.plot_trigger_sequence)
+        # self.QSpinBox_daq_sample_rate.valueChanged.connect(self.update_daq)
+        self.QPushButton_plot_trigger.clicked.connect(self.plot_trigger_sequences)
+        self.QPushButton_send_trigger.clicked.connect(self.send_trigger_sequences)
         # self.QPushButton_focus_finding.clicked.connect(self.run_focus_finding)
         self.QPushButton_video.clicked.connect(self.run_video)
         self.QPushButton_fft.clicked.connect(self.run_fft)
@@ -435,17 +436,18 @@ class ConWidget(QtWidgets.QWidget):
         power = self.QDoubleSpinBox_laserpower_405.value()
         self.Signal_set_laser.emit(["405"], checked, power)
 
-    @QtCore.pyqtSlot(int)
-    def update_daq(self, sample_rate: int):
-        self.Signal_daq_update.emit(sample_rate)
+    # @QtCore.pyqtSlot(int)
+    # def update_daq(self, sample_rate: int):
+    #     self.Signal_nucleo_update.emit(sample_rate)
 
     @QtCore.pyqtSlot()
-    def reset_daq(self):
-        self.Signal_daq_reset.emit()
-
-    @QtCore.pyqtSlot()
-    def plot_trigger_sequence(self):
+    def plot_trigger_sequences(self):
         self.Signal_plot_trigger.emit()
+
+    @QtCore.pyqtSlot()
+    def send_trigger_sequences(self):
+        mod = self.QComboBox_send_trigger.currentText()
+        self.Signal_nucleo_send.emit(mod)
 
     @QtCore.pyqtSlot()
     def run_focus_finding(self):
@@ -524,12 +526,12 @@ class ConWidget(QtWidgets.QWidget):
             set_name = None
         if set_name:
             self.digital_timing_presets[set_name] = {
-                    "QDoubleSpinBox_ttl_start_405": self.QDoubleSpinBox_ttl_start_on_405.value(),
-                    "QDoubleSpinBox_ttl_stop_405": self.QDoubleSpinBox_ttl_stop_on_405.value(),
-                    "QDoubleSpinBox_ttl_start_488": self.QDoubleSpinBox_ttl_start_off_488_0.value(),
-                    "QDoubleSpinBox_ttl_stop_488": self.QDoubleSpinBox_ttl_stop_off_488_0.value(),
+                    "QDoubleSpinBox_ttl_start_405": self.QDoubleSpinBox_ttl_start_405.value(),
+                    "QDoubleSpinBox_ttl_stop_405": self.QDoubleSpinBox_ttl_stop_405.value(),
+                    "QDoubleSpinBox_ttl_start_488": self.QDoubleSpinBox_ttl_start_488.value(),
+                    "QDoubleSpinBox_ttl_stop_488": self.QDoubleSpinBox_ttl_stop_488.value(),
                     "QDoubleSpinBox_ttl_start_thorcam": self.QDoubleSpinBox_ttl_start_thorcam.value(),
-                    "QDoubleSpinBox_ttl_stop_thorcam": self.QDoubleSpinBox_ttl_stop_scmos.value(),
+                    "QDoubleSpinBox_ttl_stop_thorcam": self.QDoubleSpinBox_ttl_stop_thorcam.value(),
                     "QDoubleSpinBox_ttl_start_webcam": self.QDoubleSpinBox_ttl_start_webcam.value(),
                     "QDoubleSpinBox_ttl_stop_webcam": self.QDoubleSpinBox_ttl_stop_webcam.value(),
             }
