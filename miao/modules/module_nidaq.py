@@ -2,7 +2,8 @@
 # Copyright (c) 2025 Ruizhe Lin
 # Licensed under the MIT License.
 
-
+import threading
+from collections import deque
 import warnings
 
 import nidaqmx
@@ -24,8 +25,10 @@ class NIDAQ:
             self.duty_cycle = 0.5
             self.galvo_channels = ["Dev1/ao0", "Dev1/ao1"]
             self.piezo_channels = ["Dev2/ao0", "Dev2/ao1", "Dev2/ao2"]
-            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line3",
-                                     "Dev1/port0/line4", "Dev1/port0/line5"]
+            self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line2",
+                                     "Dev1/port0/line3", "Dev1/port0/line4", "Dev1/port0/line5"]
+            self.photon_counter_channel = "/Dev1/ctr1"
+            self.photon_input_terminal = "/Dev1/PFI0"
             self.counter_channel = "/Dev1/ctr0"
             self.clock = ["/Dev1/PFI12", "/Dev2/PFI0"]
             self.mode = None
@@ -39,6 +42,9 @@ class NIDAQ:
         self._active = {}
         self._running = {}
         self.tasks, self._active, self._running, = self._configure()
+        self.data = None
+        self.acq_thread = None
+        self.buffer_size = 2 ** 16
 
     def __del__(self):
         pass
@@ -70,7 +76,7 @@ class NIDAQ:
 
     def _configure(self):
         try:
-            tasks = {"piezo": None, "galvo": None, "switch": None, "digital": None, "clock": None}
+            tasks = {"piezo": None, "galvo": None, "switch": None, "digital": None, "counter": None, "clock": None}
             _active = {key: False for key in tasks.keys()}
             _running = {key: False for key in tasks.keys()}
             return tasks, _active, _running
@@ -254,8 +260,7 @@ class NIDAQ:
         except nidaqmx.DaqWarning as e:
             self.logg.warning("DaqWarning caught as exception: %s", e)
             try:
-                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(
-                    e.error_code)
+                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(e.error_code)
             except AssertionError as ae:
                 self.logg.error("Assertion Error: %s", ae)
 
@@ -276,10 +281,54 @@ class NIDAQ:
         except nidaqmx.DaqWarning as e:
             self.logg.warning("DaqWarning caught as exception: %s", e)
             try:
-                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(
-                    e.error_code)
+                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(e.error_code)
             except AssertionError as ae:
                 self.logg.error("Assertion Error: %s", ae)
+
+    def set_photon_counter(self):
+        try:
+            if self.tasks["clock"] is None:
+                self.write_clock_channel()
+            self.tasks["photon_counter"] = nidaqmx.Task("photon_counter")
+            ci_channel = self.tasks["photon_counter"].ci_channels.add_ci_count_edges_chan(counter=self.photon_counter_channel,
+                                                                                          edge=nidaqmx.constants.Edge.RISING)
+            ci_channel.ci_count_edges_term = self.photon_input_terminal
+            self.tasks["photon_counter"].timing.cfg_samp_clk_timing(rate=self.sample_rate, source=self.clock[0],
+                                                                    active_edge=Edge.RISING, sample_mode=AcquisitionType.CONTINUOUS,
+                                                                    samps_per_chan=self.buffer_size)
+            self.tasks["photon_counter"].in_stream.input_buf_size = self.buffer_size
+        except nidaqmx.DaqWarning as e:
+            self.logg.warning("DaqWarning caught as exception: %s", e)
+            try:
+                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(e.error_code)
+            except AssertionError as ae:
+                self.logg.error("Assertion Error: %s", ae)
+
+    def get_photon_count(self):
+        try:
+            counts = self.tasks["photon_counter"].read(number_of_samples_per_channel=2048)
+            self.data.add_element(counts)
+        except nidaqmx.DaqWarning as e:
+            self.logg.warning("DaqWarning caught as exception: %s", e)
+            try:
+                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(e.error_code)
+            except AssertionError as ae:
+                self.logg.error("Assertion Error: %s", ae)
+
+    def start_photon_count(self):
+        self.data = DataList(self.buffer_size * 2)
+        self.acq_thread = AcquisitionThread(self)
+        self.acq_thread.start()
+        self.logg.info('Acquisition started')
+
+    def stop_photon_count(self):
+        self.acq_thread.stop()
+        self.acq_thread = None
+        self.logg.info('Acquisition stopped')
+
+    def get_data(self):
+        edg_num, count_data = self.data.get_elements()
+        return count_data
 
     def start_triggers(self):
         try:
@@ -395,3 +444,46 @@ class NIDAQ:
         except nidaqmx.DaqError as e:
             self.logg.error(f"Error checking task status: {e}")
             return True
+
+
+class AcquisitionThread(threading.Thread):
+    running = False
+    lock = threading.Lock()
+
+    def __init__(self, daq):
+        threading.Thread.__init__(self)
+        self.daq = daq
+
+    def run(self):
+        self.running = True
+        while self.running:
+            with self.lock:
+                self.daq.get_photon_count()
+
+    def stop(self):
+        self.running = False
+        self.join()
+
+
+class DataList:
+
+    def __init__(self, max_length):
+        self.data_list = deque(maxlen=max_length)
+        self.count_list = deque(maxlen=max_length)
+        self.data_list.extend([0])
+        self.count_list.extend([0])
+
+    def add_element(self, elements):
+        d = np.array(elements, dtype=int)
+        counts = np.diff(np.insert(d, 0, self.data_list[-1]))
+        self.count_list.extend(list(counts))
+        self.data_list.extend(elements)
+
+    def get_elements(self):
+        return np.array(self.data_list) if self.data_list else None, np.array(self.count_list) if self.data_list else None
+
+    def get_last_element(self):
+        return self.data_list[-1].copy() if self.data_list else None
+
+    def is_empty(self):
+        return len(self.data_list) == 0
