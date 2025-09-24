@@ -80,18 +80,21 @@ class NeoPixel:
             y_all = np.concatenate([y_all, y_reset])
         return y_all
 
-    def half_ring(self, num, start, color):
+    def half_ring(self, num, start, color, exposure):
         c = [(0, 0, 0, 0)] * num
         h = int(num / 2)
-        o = [color] * h
-        c[start:start + h] = o
-        t, x = self.led_ring(colors=c)
+        for i in range(h):
+            idx = (start + i) % num
+            c[idx] = color
+        x = self.led_ring(colors=c, reset=exposure)
         return x
 
     def dpc_sequences(self, expo):
-        expo_samples = int(expo * self.sample_rate)
-        xh = self.half_ring(24, 0, (255, 0, 0, 0))
-
+        xhp = self.half_ring(24, 0, (255, 0, 0, 0), expo)
+        xhn = self.half_ring(24, 12, (255, 0, 0, 0), expo)
+        yhp = self.half_ring(24, 6, (255, 0, 0, 0), expo)
+        yhn = self.half_ring(24, 18, (255, 0, 0, 0), expo)
+        return xhp, xhn, yhp, yhn
 
 
 if __name__ == '__main__':
