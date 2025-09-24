@@ -42,7 +42,10 @@ class MCLMicroDrive:
         self.move_thread = None
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def close(self):
         """

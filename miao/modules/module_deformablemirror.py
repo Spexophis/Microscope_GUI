@@ -45,7 +45,10 @@ class DeformableMirror:
             self.logg.error(f"Error set dm {e}")
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     @staticmethod
     def setup_logging():

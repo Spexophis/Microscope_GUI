@@ -6,6 +6,7 @@
 from miao.modules import module_andorixon
 from miao.modules import module_deformablemirror
 from miao.modules import module_hamamatsuorchflash
+from miao.modules import module_flir
 from miao.modules import module_slm_qxga
 from miao.modules import module_coboltlaser
 from miao.modules import module_mcldeck
@@ -32,8 +33,13 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
+            self.flircam = module_flir.FLIRCamera(logg=self.logg.error_log)
+            self.cam_set[2] = self.flircam
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
+        try:
             self.tiscam = module_tis.TISCamera(logg=self.logg.error_log)
-            self.cam_set[2] = self.tiscam
+            self.cam_set[3] = self.tiscam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.dm = {}
@@ -64,6 +70,12 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def close(self):
         try:

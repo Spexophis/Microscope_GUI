@@ -94,11 +94,17 @@ class TISCamera:
         self.data = CallbackData(8)
         self.frame_ready = ic.FRAMEREADYCALLBACK(frame_ready_callback)
         self.hGrabber = self._initialize_grabber()
-        if self.hGrabber is not None:
+        if self.hGrabber is None:
+            self.close()
+            raise RuntimeError("Failed to initialize TIS camera.")
+        else:
             self._configure_camera()
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def __getattr__(self, item):
         if hasattr(self._settings, item):
@@ -112,12 +118,14 @@ class TISCamera:
         return logging
 
     def close(self):
-        r = ic.IC_CloseVideoCaptureDevice(self.hGrabber)
-        if r:
-            r = ic.IC_ReleaseGrabber(self.hGrabber)
+        if getattr(self, "hGrabber", None):
+            r = ic.IC_CloseVideoCaptureDevice(self.hGrabber)
             if r:
-                ic.IC_CloseLibrary()
-                self.logg.info("TIS Camera OFF")
+                r = ic.IC_ReleaseGrabber(self.hGrabber)
+                if r:
+                    ic.IC_CloseLibrary()
+                    self.logg.info("TIS Camera OFF")
+            self.hGrabber = None  # avoid double cleanup
 
     def _initialize_grabber(self):
         device_count = ic.IC_GetDeviceCount()
@@ -134,13 +142,11 @@ class TISCamera:
                     return grabber
                 else:
                     self.logg.error('hGrabber is invalid')
-                    return None
             else:
                 self.logg.error(f"Error opening TIS camera")
-                return None
         else:
             self.logg.error('No device found')
-            return None
+        return None
 
     def _configure_camera(self):
         if ic.IC_SetFormat(self.hGrabber, tis.SinkFormats.Y16.value) == tis.IC_SUCCESS:

@@ -1,0 +1,127 @@
+import numpy as np
+
+
+class NeoPixel:
+
+    def __init__(self, logg=None):
+        self.logg = logg or self.setup_logging()
+        self.sample_rate = 8e6
+        self.time_res = 1 / self.sample_rate
+        self.bit_time = 1.25e-6 # s
+        self.bit_sample = int(self.bit_time * self.sample_rate)
+        self.bit_0_high = 2
+        self.bit_0_low = 8
+        self.bit_1_high = 7
+        self.bit_1_low = 3
+        self.reset_time = 80e-6 # s
+        self.reset_sample = int(self.reset_time * self.sample_rate)
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def setup_logging():
+        import logging
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+        return logging
+
+    def close(self):
+        pass
+
+    def pulse_wave(self, bit_type=0):
+        """Return time and waveform for one bit ('0' or '1')."""
+        if bit_type:
+            bit_high = self.bit_1_high
+        else:
+            bit_high = self.bit_0_high
+        t = np.linspace(0, self.bit_time * 1e6, self.bit_sample, endpoint=False)
+        x = np.zeros(self.bit_sample, dtype=np.uint8)
+        x[:bit_high] = 1
+        return t, x
+
+    def byte_wave(self, byte_val):
+        """Function to build waveform for a byte (MSB first)"""
+        bits = [(byte_val >> (7 - i)) & 1 for i in range(8)]  # MSB first
+        t_byte, x_byte = [], []
+        for i, b in enumerate(bits):
+            t, x = self.pulse_wave(b)
+            if len(t_byte) == 0:
+                t_byte, x_byte = t, x
+            else:
+                t_byte = np.concatenate([t_byte, t + t_byte[-1] + self.time_res])
+                x_byte = np.concatenate([x_byte, x])
+        return t_byte, x_byte
+
+    def color_wave(self, g, r, b, w):
+        _, y_g = self.byte_wave(g)
+        _, y_r = self.byte_wave(r)
+        _, y_b = self.byte_wave(b)
+        _, y_w = self.byte_wave(w)
+        y_all = np.concatenate([y_g, y_r, y_b, y_w])
+        t_all = np.arange(len(y_all)) * self.time_res * 1e6
+        return t_all, y_all
+
+    def led_ring(self, colors=None, reset=None):
+        if colors is None:
+            colors = [[255, 0, 0, 0]] * 24
+        y_all = []
+        for g, r, b, w in colors:
+            _, y_led = self.color_wave(g, r, b, w)
+            y_all = np.concatenate([y_all, y_led]) if len(y_all) else y_led
+        if reset is None:
+            y_reset = np.zeros(self.reset_sample, dtype=np.uint8)
+            y_all = np.concatenate([y_all, y_reset])
+        else:
+            reset_samples = int(reset * self.sample_rate)
+            y_reset = np.zeros(reset_samples, dtype=np.uint8)
+            y_all = np.concatenate([y_all, y_reset])
+        return y_all
+
+    def half_ring(self, num, start, color):
+        c = [(0, 0, 0, 0)] * num
+        h = int(num / 2)
+        o = [color] * h
+        c[start:start + h] = o
+        t, x = self.led_ring(colors=c)
+        return x
+
+    def dpc_sequences(self, expo):
+        expo_samples = int(expo * self.sample_rate)
+        xh = self.half_ring(24, 0, (255, 0, 0, 0))
+
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
+    p = NeoPixel()
+
+    ts, xs = p.byte_wave(0xFF)
+    plt.figure(figsize=(12, 3))
+    plt.step(ts, xs, where='post')
+    plt.xlabel("Time (µs)")
+    plt.ylabel("Signal level")
+    plt.title("NeoPixel Data Pulse for Bright Green (GRB = FF0000)")
+    plt.grid(True)
+    plt.show()
+
+    ts, xs = p.color_wave(0xFF, 0x00, 0x00)
+    plt.figure(figsize=(12, 3))
+    plt.step(ts, xs, where='post')
+    plt.xlabel("Time (µs)")
+    plt.ylabel("Signal level")
+    plt.title("NeoPixel Data Pulse for Bright Green (GRB = FF0000)")
+    plt.grid(True)
+    plt.show()
+
+    ts, xs = p.led_ring()
+    plt.figure(figsize=(12,3))
+    plt.step(ts, xs, where='post')
+    plt.xlabel("Time (µs)")
+    plt.ylabel("Signal level")
+    plt.title("NeoPixel Ring 16: Full Data Frame (16 × 24 bits + Reset)")
+    plt.grid(True)
+    plt.show()

@@ -27,6 +27,12 @@ class QXGA:
         self.get_temperature()
         self.ord_dict = self.get_order_list()
 
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     @staticmethod
     def setup_logging():
         import logging

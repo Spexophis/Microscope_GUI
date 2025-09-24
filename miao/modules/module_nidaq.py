@@ -25,7 +25,8 @@ class NIDAQ:
             self.galvo_channels = ["Dev1/ao0", "Dev1/ao1"]
             self.piezo_channels = ["Dev2/ao0", "Dev2/ao1", "Dev2/ao2"]
             self.digital_channels = ["Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line3",
-                                     "Dev1/port0/line4", "Dev1/port0/line5"]
+                                     "Dev1/port0/line4", "Dev1/port0/line5", "Dev1/port0/line6"]
+            self.led_channels = ["Dev2/port0/line5", "Dev2/port0/line6", "Dev2/port0/line7"]
             self.counter_channel = "/Dev1/ctr0"
             self.clock = ["/Dev1/PFI12", "/Dev2/PFI0"]
             self.mode = None
@@ -41,7 +42,10 @@ class NIDAQ:
         self.tasks, self._active, self._running, = self._configure()
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def __getattr__(self, item):
         if hasattr(self._settings, item):
@@ -70,7 +74,7 @@ class NIDAQ:
 
     def _configure(self):
         try:
-            tasks = {"piezo": None, "galvo": None, "switch": None, "digital": None, "clock": None}
+            tasks = {"piezo": None, "galvo": None, "switch": None, "led": None, "digital": None, "clock": None}
             _active = {key: False for key in tasks.keys()}
             _running = {key: False for key in tasks.keys()}
             return tasks, _active, _running
@@ -142,6 +146,40 @@ class NIDAQ:
                                                 active_edge=Edge.RISING)
                 p = task.read(number_of_samples_per_channel=10)
             return sum(p) / len(p)
+        except nidaqmx.DaqWarning as e:
+            self.logg.warning("DaqWarning caught as exception: %s", e)
+            try:
+                assert e.error_code == DAQmxWarnings.STOPPED_BEFORE_DONE, "Unexpected error code: {}".format(
+                    e.error_code)
+            except AssertionError as ae:
+                self.logg.error("Assertion Error: %s", ae)
+
+    def write_led_triggers(self, digital_sequences, indices=None, finite=True):
+        if finite:
+            mode = AcquisitionType.FINITE
+        else:
+            mode = AcquisitionType.CONTINUOUS
+        if indices is None:
+            indices = [0, 1, 2]
+        if digital_sequences.ndim > 1:
+            n_channels, n_samples = digital_sequences.shape
+            if n_channels == 1:
+                digital_sequences = digital_sequences[0]
+        else:
+            n_channels = 1
+            n_samples = digital_sequences.shape[0]
+        if n_channels != len(indices):
+            self.logg.error("WARNING: Length of n_channels and indices differ, skipping digital sequences update.")
+            return
+        try:
+            self.tasks["led"] = nidaqmx.Task("led")
+            for ind in indices:
+                self.tasks["led"].do_channels.add_do_chan(self.led_channels[ind],
+                                                          line_grouping=LineGrouping.CHAN_PER_LINE)
+            self.tasks["led"].timing.cfg_samp_clk_timing(rate=8e6, active_edge=Edge.RISING, sample_mode=mode,
+                                                         samps_per_chan=n_samples)
+            self.tasks["led"].write(digital_sequences == 1.0, auto_start=True)
+            self._active["led"] = True
         except nidaqmx.DaqWarning as e:
             self.logg.warning("DaqWarning caught as exception: %s", e)
             try:

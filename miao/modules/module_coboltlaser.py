@@ -16,6 +16,12 @@ class CoboltLaser:
             laser_dict[las] = inf["Serial"]
         self.lasers, self._h = self._initiate_lasers(laser_dict)
 
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def _initiate_lasers(self, laser_dict):
         lasers = {}
         for laser, com_port in laser_dict.items():

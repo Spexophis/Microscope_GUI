@@ -48,7 +48,10 @@ class MCLNanoDrive:
                 self.calib.append(self.mcl_piezo.get_calibration(ax, self.handle))
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def close(self):
         """

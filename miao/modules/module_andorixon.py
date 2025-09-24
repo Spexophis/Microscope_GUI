@@ -55,7 +55,10 @@ class EMCCDCamera:
         self.acq_thread = None
 
     def __del__(self):
-        pass
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def __getattr__(self, item):
         if hasattr(self._settings, item):
