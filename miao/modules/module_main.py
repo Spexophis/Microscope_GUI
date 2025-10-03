@@ -1,9 +1,8 @@
-# from miao.modules import module_thorlabcam
 from miao.modules import module_hamamtsu_scmos
 from miao.modules import module_tis
 from miao.modules import module_coboltlaser
 from miao.modules import module_deformablemirror
-from miao.modules import module_board
+from miao.modules import module_nucleo
 
 class MainModule:
 
@@ -33,7 +32,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.nucleo = module_board.NucleoBoards(logg=self.logg.error_log, config=self.config)
+            self.nucleo = module_nucleo.NucleoBoards(logg=self.logg.error_log, config=self.config)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")
