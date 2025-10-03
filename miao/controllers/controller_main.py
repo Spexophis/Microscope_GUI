@@ -222,7 +222,7 @@ class MainController(QtCore.QObject):
         try:
             if self.cameras[key] == 0:
                 x, y, nx, ny, bn = self.con_controller.get_thorcam_roi()
-                self.m.cam_set[self.cameras[key]].set_roi(x, y, x + nx - 1, y + ny - 1)
+                self.m.cam_set[self.cameras[key]].set_roi(bn, bn, x, nx, y, ny)
             if self.cameras[key] == 1:
                 expo = self.con_controller.get_webcam_expo()
                 self.m.cam_set[self.cameras[key]].set_exposure(expo)
@@ -264,9 +264,7 @@ class MainController(QtCore.QObject):
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
                                          digital_sequences=dtr, digital_channels=chs, infinity=True)
         elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
-            x = np.zeros((1, dtr.shape[1]))
-            dtr = np.vstack((x, dtr))
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
                                          digital_sequences=dtr, digital_channels=chs, infinity=True)
         else:
@@ -291,9 +289,7 @@ class MainController(QtCore.QObject):
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
         elif "Dot Scan" in acq_mod:
             self.m.cam_set[self.cameras["imaging"]].acq_num = 1
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
-            x = np.zeros((1, dtr.shape[1]))
-            dtr = np.vstack((x, dtr))
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
         else:
@@ -316,14 +312,11 @@ class MainController(QtCore.QObject):
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
         elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
-            x = np.zeros((1, dtr.shape[1]))
-            dtr = np.vstack((x, dtr))
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+                                         digital_sequences=dtr, digital_channels=chs, infinity=True)
         else:
             raise ValueError("Invalid video mode")
-
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
@@ -349,6 +342,7 @@ class MainController(QtCore.QObject):
         return self.p.trigger.generate_digital_triggers(self.lasers, self.cameras[cam_key])
 
     def prepare_video(self):
+        self.lasers = [0, 1]
         self.set_lasers(self.lasers)
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
@@ -966,29 +960,6 @@ class MainController(QtCore.QObject):
         self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
-        self.update_trigger_parameters("imaging")
-        vd_mod = self.con_controller.get_live_mode()
-        if vd_mod == "Wide Field":
-            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
-            rpn = self.m.nucleo.signal_length // dtr.shape[1]
-            if rpn > 1:
-                dtr = np.pad(dtr, ((0, 0), (0, dtr.shape[1] * (rpn - 1))), 'constant', constant_values=((0, 0), (0, 0)))
-            g_x, g_y = self.con_controller.get_galvo_positions()
-            gtr = np.ones((2, self.m.nucleo.signal_length))
-            gtr[0] = gtr[0] * g_x
-            gtr[1] = gtr[1] * g_y
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
-        elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_digital_scanning_triggers([0, 1], self.cameras["imaging"])
-            x = np.zeros((1, dtr.shape[1]))
-            dtr = np.vstack((x, dtr))
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
-        else:
-            self.m.cam_set[self.cameras["imaging"]].stop_live()
-            self.lasers_off()
-            raise ValueError("Invalid video mode")
 
     def sensorless_iteration(self, dms):
         ims = []

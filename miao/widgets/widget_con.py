@@ -77,11 +77,11 @@ class ConWidget(QtWidgets.QWidget):
         layout_camera = QtWidgets.QHBoxLayout()
 
         self.QDoubleSpinBox_thorcam_exposure_time = cw.DoubleSpinBoxWidget(0, 10, 0.005, 3, 0.01)
-        self.QSpinBox_thorcam_coordinate_x = cw.SpinBoxWidget(0, 2447, 1, 0)
+        self.QSpinBox_thorcam_coordinate_x = cw.SpinBoxWidget(0, 2047, 1, 0)
         self.QSpinBox_thorcam_coordinate_y = cw.SpinBoxWidget(0, 2047, 1, 0)
-        self.QSpinBox_thorcam_coordinate_nx = cw.SpinBoxWidget(0, 2448, 1, 2448)
+        self.QSpinBox_thorcam_coordinate_nx = cw.SpinBoxWidget(0, 2048, 1, 2048)
         self.QSpinBox_thorcam_coordinate_ny = cw.SpinBoxWidget(0, 2048, 1, 2048)
-        self.QSpinBox_thorcam_coordinate_bin = cw.SpinBoxWidget(0, 2447, 1, 1)
+        self.QSpinBox_thorcam_coordinate_bin = cw.SpinBoxWidget(0, 2048, 1, 1)
 
         self.thorcam_scroll_area, thorcam_scroll_layout = cw.create_scroll_area()
         thorcam_scroll_layout.addRow(cw.LabelWidget(str('Thorlabs')))

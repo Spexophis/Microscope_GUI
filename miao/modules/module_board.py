@@ -101,13 +101,13 @@ class NucleoBoards:
                     pa1 = digital_sequences[1][:self.signal_length]
                 self.send_sequence(self.ser_dig, 'PA1', pa1, is_dac=False)
                 time.sleep(0.2)
-                dfn = self.signal_length - len(digital_sequences[2])
+                dfn = self.signal_length - len(digital_sequences[-1])
                 if dfn > 0:
-                    temp = [digital_sequences[2][-1]] * dfn
-                    pb10 = digital_sequences[2]
+                    temp = [digital_sequences[-1][-1]] * dfn
+                    pb10 = digital_sequences[-1]
                     pb10.extend(temp)
                 else:
-                    pb10 = digital_sequences[2][:self.signal_length]
+                    pb10 = digital_sequences[-1][:self.signal_length]
                 self.send_sequence(self.ser_dig, 'PB10', pb10, is_dac=False)
                 time.sleep(0.2)
             except RuntimeError as e:

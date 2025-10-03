@@ -24,6 +24,7 @@ class ThorCMOS:
             self.end_v = 2047
             self.pixels_x = 2448
             self.pixels_y = 2048
+            self.gain = 48
             self.ps = 3.45  # micron
             self.acq_num = 0
             self.acq_first = 0
@@ -99,12 +100,16 @@ class ThorCMOS:
         # self.camera.image_poll_timeout_ms = 0  # 1 second polling timeout
         self.set_acquisition_mode(2)
         self.set_trigger_polarity(0)
+        self.set_gain()
 
     def close(self):
         if self.camera.is_armed:
             self.camera.disarm()
         self.camera.dispose()
         self.sdk.dispose()
+
+    def set_gain(self):
+        self.camera.gain = self.gain
 
     def set_roi(self, upper_left_x_pixels, upper_left_y_pixels, lower_right_x_pixels, lower_right_y_pixels):
         self.camera.roi = (upper_left_x_pixels, upper_left_y_pixels, lower_right_x_pixels, lower_right_y_pixels)

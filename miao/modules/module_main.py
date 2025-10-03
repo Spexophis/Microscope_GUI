@@ -1,4 +1,5 @@
-from miao.modules import module_thorlabcam
+# from miao.modules import module_thorlabcam
+from miao.modules import module_hamamtsu_scmos
 from miao.modules import module_tis
 from miao.modules import module_coboltlaser
 from miao.modules import module_deformablemirror
@@ -12,8 +13,8 @@ class MainModule:
         self.data_folder = path
         self.cam_set = {}
         try:
-            self.thorcam = module_thorlabcam.ThorCMOS(logg=self.logg.error_log)
-            self.cam_set[0] = self.thorcam
+            self.hcam = module_hamamtsu_scmos.HamamatsuCamera(logg=self.logg.error_log)
+            self.cam_set[0] = self.hcam
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
