@@ -15,7 +15,7 @@ class NucleoBoards:
         self.period = 63
         self.sample_rate = 64e6/(self.prescaler + 1) * (self.period + 1)
         self.sequence_length = 64000  # must match firmware
-        self.t = 0.1
+        self.t = 0.1 * max((1e6 / self.sample_rate), 1)
         self.digital_sequences = []
         self.analog_sequences = []
         self.trg_thread = None
@@ -49,6 +49,7 @@ class NucleoBoards:
         self.prescaler = prescaler
         self.period = period
         self.sample_rate = 64/(self.prescaler + 1) * (self.period + 1)
+        self.t = 0.1 * max((1e6 / self.sample_rate), 1)
         cmd = f"CLOCK {prescaler} {period}"
         self.send_command(cmd)
 
