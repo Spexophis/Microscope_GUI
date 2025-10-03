@@ -408,28 +408,6 @@ class EMCCDCamera:
         else:
             self.logg.error(atmcd_errors.Error_Codes(ret))
 
-    # def prepare_data_acquisition(self, num):
-    #     self.set_readout_mode(4)
-    #     self.set_acquisition_mode(3)
-    #     self.set_kinetics_num(num)
-    #     self.set_trigger_mode(7)
-    #     # self.set_exposure_time()
-    #     self.set_roi()
-    #     self.get_acquisition_timings()
-    #     self.get_buffer_size()
-    #     ret = self.sdk.PrepareAcquisition()
-    #     if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
-    #         self.logg.info('Ready to acquire data')
-    #     else:
-    #         self.logg.error(atmcd_errors.Error_Codes(ret))
-    #
-    # def start_data_acquisition(self):
-    #     ret = self.sdk.StartAcquisition()
-    #     if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
-    #         self.logg.info('Kinetic acquisition start')
-    #     else:
-    #         self.logg.error(atmcd_errors.Error_Codes(ret))
-
     def get_acq_num(self):
         ret, first, last = self.sdk.GetNumberAvailableImages()
         if ret == atmcd_errors.Error_Codes.DRV_SUCCESS:
