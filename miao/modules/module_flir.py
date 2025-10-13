@@ -1,3 +1,5 @@
+import time
+
 import PySpin
 import numpy as np
 import threading
@@ -26,7 +28,7 @@ class FLIRCamera:
             self.pixels_y = 1536
             self.img_size = self.pixels_x * self.pixels_y
             self.ps = 3.45  # micron
-            self.buffer_size = 10
+            self.buffer_size = 4
             self.acq_num = 0
             self.acq_first = 0
             self.acq_last = 0
@@ -88,7 +90,7 @@ class FLIRCamera:
             return False, None
 
     def _camera_info(self, nod_map):
-        self.logg.info('*** FLIR CAMERA INFORMATION ***\n')
+        self.logg.info('*** FLIR CAMERA INFORMATION ***')
         try:
             node_device_information = PySpin.CCategoryPtr(nod_map.GetNode('DeviceInformation'))
             if PySpin.IsReadable(node_device_information):
@@ -129,17 +131,14 @@ class FLIRCamera:
             # Turn off automatic gain
             node_gain_auto = PySpin.CEnumerationPtr(self.node_map.GetNode('GainAuto'))
             if read_writeable(node_gain_auto):
-
-                
-                print('Unable to disable automatic gain (node retrieval). Aborting...')
-
-            node_gain_auto_off = PySpin.CEnumEntryPtr(node_gain_auto.GetEntryByName('Off'))
-            if not PySpin.IsReadable(node_gain_auto_off):
-                print('Unable to disable automatic gain (enum entry retrieval). Aborting...')
-                return False
-
-            node_gain_auto.SetIntValue(node_gain_auto_off.GetValue())
-            print('Automatic gain disabled...')
+                node_gain_auto_off = PySpin.CEnumEntryPtr(node_gain_auto.GetEntryByName('Off'))
+                if PySpin.IsReadable(node_gain_auto_off):
+                    node_gain_auto.SetIntValue(node_gain_auto_off.GetValue())
+                    self.logg.info('Automatic gain disabled...')
+                else:
+                    self.logg.info('Unable to disable automatic gain (enum entry retrieval). Aborting...')
+            else:
+                self.logg.info('Unable to disable automatic gain (node retrieval). Aborting...')
 
             # Turn off automatic exposure mode
             if self.cam.ExposureAuto.GetAccessMode() == PySpin.RW:
@@ -167,17 +166,23 @@ class FLIRCamera:
         3 - Continuous
         """
         try:
-            node_acquisition_mode = PySpin.CEnumerationPtr(self.node_map.GetNode('AcquisitionMode'))
-            if read_writeable(node_acquisition_mode):
-                node_acquisition_mode_continuous = node_acquisition_mode.GetEntryByName('Continuous')
-                if PySpin.IsReadable(node_acquisition_mode_continuous):
-                    acquisition_mode_continuous = node_acquisition_mode_continuous.GetValue()
-                    node_acquisition_mode.SetIntValue(acquisition_mode_continuous)
-                    self.logg.info('Acquisition mode set to continuous...')
+            if self.cam.AcquisitionMode.GetAccessMode() == PySpin.RW:
+                if ind == 1:
+                    md = PySpin.AcquisitionMode_SingleFrame
+                    self.cam.AcquisitionMode.SetValue(md)
+                    self.logg.info('Acquisition mode set to Single Frame...')
+                elif ind == 2:
+                    md = PySpin.AcquisitionMode_MultiFrame
+                    self.cam.AcquisitionMode.SetValue(md)
+                    self.logg.info('Acquisition mode set to Multi Frame...')
+                elif ind == 3:
+                    md = PySpin.AcquisitionMode_Continuous
+                    self.cam.AcquisitionMode.SetValue(md)
+                    self.logg.info('Acquisition mode set to Continuous...')
                 else:
-                    self.logg.error('Unable to set acquisition mode to continuous (entry retrieval). Aborting...\n')
+                    self.logg.error('Invalid acquisition mode. Aborting...')
             else:
-                self.logg.error('Unable to set acquisition mode to continuous (enum retrieval). Aborting...\n')
+                self.logg.error('Unable to set acquisition mode. Aborting...')
         except PySpin.SpinnakerException as ex:
             self.logg.error('Error: %s' % ex)
 
@@ -240,69 +245,85 @@ class FLIRCamera:
         is to use the multi-frame mode.
         """
         try:
+            # Set TriggerSelector to FrameStart
+            # This is the default for most cameras.
+            if self.cam.TriggerSelector.GetAccessMode() == PySpin.RW:
+                self.cam.TriggerSelector.SetValue(PySpin.TriggerSelector_FrameStart)
+                self.logg.info('Trigger selector set to frame start...')
+            else:
+                self.logg.error('Unable to get trigger selector (node retrieval). Aborting...')
             # Ensure trigger mode off
             # The trigger must be disabled in order to configure whether the source is software or hardware.
             if self.cam.TriggerMode.GetAccessMode() == PySpin.RW:
                 self.cam.TriggerMode.SetValue(PySpin.TriggerMode_Off)
                 self.logg.info('Trigger mode disabled...')
-
-                # Set TriggerSelector to FrameStart
-                # This is the default for most cameras.
-                if self.cam.TriggerSelector.GetAccessMode() == PySpin.RW:
-                    self.cam.TriggerSelector.SetValue(PySpin.TriggerSelector_FrameStart)
-                    self.logg.info('Trigger selector set to frame start...')
-
+                if ind == 1:
                     # Select trigger source
                     # The trigger source must be set to hardware or software while trigger mode is off.
                     if self.cam.TriggerSource.GetAccessMode() == PySpin.RW:
-                        if ind == 1:
-                            self.cam.TriggerSource.SetValue(PySpin.TriggerSource_Software)
-                            self.logg.info('Trigger source set to software...')
-                        elif ind == 2:
-                            self.cam.TriggerSource.SetValue(PySpin.TriggerSource_Line0)
-                            self.logg.info('Trigger source set to hardware...')
-                        else:
-                            self.logg.error('Invalid trigger source. Aborting...')
-
+                        self.cam.TriggerSource.SetValue(PySpin.TriggerSource_Software)
+                        self.logg.info('Trigger source set to software...')
                     else:
                         self.logg.error('Unable to get trigger source (node retrieval). Aborting...')
-
+                elif ind == 2:
+                    if self.cam.TriggerSource.GetAccessMode() == PySpin.RW:
+                        self.cam.TriggerSource.SetValue(PySpin.TriggerSource_Line3)
+                        self.logg.info('Trigger source set to hardware...')
+                    else:
+                        self.logg.error('Unable to get trigger source (node retrieval). Aborting...')
                 else:
-                    self.logg.error('Unable to get trigger selector (node retrieval). Aborting...')
-
+                    self.logg.error('Invalid trigger source. Aborting...')
             else:
                 self.logg.error('Unable to disable trigger mode (node retrieval). Aborting...')
         except PySpin.SpinnakerException as ex:
             self.logg.error('Error: %s' % ex)
 
-    def reset_trigger(self):
+    def open_trigger(self):
         """
-        This function returns the camera to a normal state by turning off trigger mode.
+        This function turn trigger mode on in order to retrieve images using the trigger.
         """
         try:
-            # Turn trigger mode back off
-            # Once all images have been captured, turn trigger mode back off to restore the camera to a clean state.
+            trigger_mode = PySpin.CEnumerationPtr(self.node_map.GetNode('TriggerMode'))
+            if read_writeable(trigger_mode):
+                trigger_mode_on = PySpin.CEnumEntryPtr(trigger_mode.GetEntryByName('On'))
+                if PySpin.IsReadable(trigger_mode_on):
+                    trigger_mode.SetIntValue(trigger_mode_on.GetValue())
+                    self.logg.info('Trigger mode turned on...\n')
+                else:
+                    self.logg.error('Unable to turn on trigger mode (enum entry retrieval). Non-fatal error...\n')
+            else:
+                self.logg.error('Unable to turn on trigger mode (node retrieval). Non-fatal error...\n')
+        except PySpin.SpinnakerException as ex:
+            self.logg.error('Error: %s' % ex)
+
+    def close_trigger(self):
+        """
+        This function turn trigger mode off to restore the camera to a clean state.
+        """
+        try:
             trigger_mode = PySpin.CEnumerationPtr(self.node_map.GetNode('TriggerMode'))
             if read_writeable(trigger_mode):
                 trigger_mode_off = PySpin.CEnumEntryPtr(trigger_mode.GetEntryByName('Off'))
                 if PySpin.IsReadable(trigger_mode_off):
                     trigger_mode.SetIntValue(trigger_mode_off.GetValue())
-                    self.logg.info('Trigger mode disabled...\n')
+                    self.logg.info('Trigger mode turned off...\n')
                 else:
-                    self.logg.error('Unable to disable trigger mode (enum entry retrieval). Non-fatal error...\n')
+                    self.logg.error('Unable to turn off trigger mode (enum entry retrieval). Non-fatal error...\n')
             else:
-                self.logg.error('Unable to disable trigger mode (node retrieval). Non-fatal error...\n')
+                self.logg.error('Unable to turn off trigger mode (node retrieval). Non-fatal error...\n')
         except PySpin.SpinnakerException as ex:
             self.logg.error('Error: %s' % ex)
 
     def software_trigger(self):
         try:
             # Execute software trigger
-            software_trigger_command = PySpin.CCommandPtr(self.node_map.GetNode('TriggerSoftware'))
-            if PySpin.IsWritable(software_trigger_command):
-                software_trigger_command.Execute()
+            # Blackfly and Flea3 GEV cameras need 2 second delay after software trigger
+            if self.cam.TriggerSoftware.GetAccessMode() == PySpin.WO:
+                self.cam.TriggerSoftware.Execute()
+                self.logg.info('Software trigger emitted')
+                time.sleep(2.0)
             else:
-                self.logg.error('Unable to execute trigger. Aborting...\n')
+                self.logg.error('Unable to execute trigger. Aborting...')
         except PySpin.SpinnakerException as ex:
             self.logg.error('Error: %s' % ex)
 
@@ -364,13 +385,14 @@ class FLIRCamera:
         Change gain
         """
         try:
-            node_gain = PySpin.CFloatPtr(self.node_map.GetNode('Gain'))
-            if not PySpin.IsReadable(node_gain) or not PySpin.IsWritable(node_gain) or node_gain.GetMax() == 0:
-                gain_to_set = min(node_gain.GetMax(), self.gain)
-                node_gain.SetValue(gain_to_set)
-                self.logg.info('Gain is changed to %f...\n' % gain_to_set)
+            if self.cam.Gain.GetAccessMode() == PySpin.RW:
+                gain_to_set = min(self.cam.Gain.GetMax(), self.gain)
+                self.cam.Gain.SetValue(gain_to_set)
+                time.sleep(0.001)
+                current_gain = self.cam.Gain.GetValue()
+                self.logg.info(f'Gain set to {current_gain}')
             else:
-                self.logg.error('Unable to retrieve gain...')
+                self.logg.error('Unable to set gain. Aborting...')
         except PySpin.SpinnakerException as ex:
             self.logg.error('Error: %s' % ex)
 
@@ -382,7 +404,9 @@ class FLIRCamera:
             if self.cam.ExposureTime.GetAccessMode() == PySpin.RW:
                 exposure_time_to_set = min(self.cam.ExposureTime.GetMax(), self.t_exposure)
                 self.cam.ExposureTime.SetValue(exposure_time_to_set)
-                self.logg.info('Shutter time set to %s us...\n' % exposure_time_to_set)
+                time.sleep(0.001)
+                current_exposure_time = self.cam.ExposureTime.GetValue()
+                self.logg.info(f'Shutter time set to {current_exposure_time} us')
             else:
                 self.logg.error('Unable to set exposure time. Aborting...')
         except PySpin.SpinnakerException as ex:
@@ -391,9 +415,7 @@ class FLIRCamera:
     def prepare_live(self):
         self.set_gain()
         self.set_buffer(1)
-        # Turn trigger mode on in order to retrieve images using the trigger.
-        self.cam.TriggerMode.SetValue(PySpin.TriggerMode_On)
-        self.logg.info('Trigger mode turned on...')
+        self.open_trigger()
 
     def start_live(self):
         self.cam.BeginAcquisition()
@@ -401,7 +423,7 @@ class FLIRCamera:
 
     def stop_live(self):
         self.cam.EndAcquisition()
-        self.reset_trigger()
+        self.close_trigger()
 
     def get_image(self, ind=False):
         try:
@@ -438,9 +460,7 @@ class FLIRCamera:
         self.set_gain()
         self.buffer_size = self.acq_num
         self.set_buffer(1)
-        # Turn trigger mode on in order to retrieve images using the trigger.
-        self.cam.TriggerMode.SetValue(PySpin.TriggerMode_On)
-        self.logg.info('Trigger mode turned on...')
+        self.open_trigger()
 
     def start_data_acquisition(self):
         self.data = np.zeros((self.acq_num, self.pixels_x, self.pixels_y))
@@ -449,7 +469,7 @@ class FLIRCamera:
 
     def stop_data_acquisition(self):
         self.cam.EndAcquisition()
-        self.reset_trigger()
+        self.close_trigger()
 
     def get_data(self):
         re = self.get_image(True)
