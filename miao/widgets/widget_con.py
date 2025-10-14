@@ -76,7 +76,7 @@ class ConWidget(QtWidgets.QWidget):
     def _create_camera_widgets(self):
         layout_camera = QtWidgets.QHBoxLayout()
 
-        self.QDoubleSpinBox_thorcam_exposure_time = cw.DoubleSpinBoxWidget(0, 10, 0.005, 3, 0.01)
+        self.QDoubleSpinBox_thorcam_exposure_time = cw.DoubleSpinBoxWidget(0.001, 10, 0.001, 3, 0.001)
         self.QSpinBox_thorcam_coordinate_x = cw.SpinBoxWidget(0, 2047, 1, 0)
         self.QSpinBox_thorcam_coordinate_y = cw.SpinBoxWidget(0, 2047, 1, 0)
         self.QSpinBox_thorcam_coordinate_nx = cw.SpinBoxWidget(0, 2048, 1, 2048)
@@ -126,6 +126,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_dot_range_y = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.2)
         self.QDoubleSpinBox_dot_step_x = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.01720)
         self.QSpinBox_dot_step_x = cw.SpinBoxWidget(0, 4000, 1, 88)
+        self.QDoubleSpinBox_sample_high = cw.SpinBoxWidget(0, 4000, 1, 1)
         self.QDoubleSpinBox_dot_step_y = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.01720)
         self.QDoubleSpinBox_galvo_offset_x = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0.0)
         self.QDoubleSpinBox_galvo_offset_y = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0.0)
@@ -138,6 +139,7 @@ class ConWidget(QtWidgets.QWidget):
         self.QDoubleSpinBox_dot_range_y_act = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.2)
         self.QDoubleSpinBox_dot_step_x_act = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.01720)
         self.QSpinBox_dot_step_x_act = cw.SpinBoxWidget(0, 4000, 1, 88)
+        self.QDoubleSpinBox_sample_high_act = cw.SpinBoxWidget(0, 4000, 1, 1)
         self.QDoubleSpinBox_dot_step_y_act = cw.DoubleSpinBoxWidget(0, 10, 0.0001, 5, 0.01720)
         self.QDoubleSpinBox_galvo_offset_x_act = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0.0)
         self.QDoubleSpinBox_galvo_offset_y_act = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0.0)
@@ -187,6 +189,9 @@ class ConWidget(QtWidgets.QWidget):
         galvo_scroll_layout.addWidget(cw.LabelWidget(str('Offset Y / volt')), 13, 0)
         galvo_scroll_layout.addWidget(self.QDoubleSpinBox_galvo_offset_y, 13, 1)
         galvo_scroll_layout.addWidget(self.QDoubleSpinBox_galvo_offset_y_act, 13, 2)
+        galvo_scroll_layout.addWidget(cw.LabelWidget(str('High / sample')), 14, 0)
+        galvo_scroll_layout.addWidget(self.QDoubleSpinBox_sample_high, 14, 1)
+        galvo_scroll_layout.addWidget(self.QDoubleSpinBox_sample_high_act, 14, 2)
         galvo_scroll_layout.addWidget(self.QComboBox_galvo_scan_presets, 15, 0, 1, 2)
         galvo_scroll_layout.addWidget(self.QPushButton_save_galvo_scan_presets, 15, 2)
         galvo_scroll_layout.addWidget(self.QLineEdit_new_galvo_scan_preset, 16, 0)
@@ -223,17 +228,22 @@ class ConWidget(QtWidgets.QWidget):
         self.QPushButton_plot_trigger = cw.PushButtonWidget("Plot Triggers")
         self.QComboBox_send_trigger = cw.ComboBoxWidget(list_items=["video", "acquire", "ao"])
         self.QPushButton_send_trigger = cw.PushButtonWidget("Send Triggers")
-        self.QDoubleSpinBox_ttl_start_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
-        self.QDoubleSpinBox_ttl_stop_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
-        self.QDoubleSpinBox_ttl_start_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
-        self.QDoubleSpinBox_ttl_stop_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
-        self.QDoubleSpinBox_ttl_start_thorcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
-        self.QDoubleSpinBox_ttl_stop_thorcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
-        self.QDoubleSpinBox_ttl_start_webcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.008)
-        self.QDoubleSpinBox_ttl_stop_webcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 5, 0.032)
+        self.QDoubleSpinBox_ttl_start_off = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.000)
+        self.QDoubleSpinBox_ttl_stop_off = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.010)
+        self.QDoubleSpinBox_ttl_start_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.008)
+        self.QDoubleSpinBox_ttl_stop_405 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.032)
+        self.QDoubleSpinBox_ttl_start_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.008)
+        self.QDoubleSpinBox_ttl_stop_488 = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.032)
+        self.QDoubleSpinBox_ttl_start_thorcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.008)
+        self.QDoubleSpinBox_ttl_stop_thorcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.032)
+        # self.QDoubleSpinBox_ttl_start_webcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.008)
+        # self.QDoubleSpinBox_ttl_stop_webcam = cw.DoubleSpinBoxWidget(0, 50, 0.001, 6, 0.032)
 
-        layout_daq.addWidget(cw.LabelWidget(str('From / s')), 1, 1, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('To / s')), 2, 1, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('From / s')), 1, 0, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('To / s')), 2, 0, 1, 1)
+        layout_daq.addWidget(cw.LabelWidget(str('OFF')), 0, 1, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_off, 1, 1, 1, 1)
+        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_off, 2, 1, 1, 1)
         layout_daq.addWidget(cw.LabelWidget(str('405')), 0, 2, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_405, 1, 2, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_405, 2, 2, 1, 1)
@@ -243,15 +253,15 @@ class ConWidget(QtWidgets.QWidget):
         layout_daq.addWidget(cw.LabelWidget(str('Kira')), 0, 4, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_thorcam, 1, 4, 1, 1)
         layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_thorcam, 2, 4, 1, 1)
-        layout_daq.addWidget(cw.LabelWidget(str('Web')), 0, 5, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_webcam, 1, 5, 1, 1)
-        layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_webcam, 2, 5, 1, 1)
-        layout_daq.addWidget(cw.FrameWidget(), 3, 1, 1, 5)
-        layout_daq.addWidget(cw.LabelWidget(str('Sample Rate / KS/s')), 4, 1, 1, 1)
-        layout_daq.addWidget(self.QSpinBox_daq_sample_rate, 4, 2, 1, 1)
-        layout_daq.addWidget(self.QPushButton_plot_trigger, 4, 3, 1, 1)
-        layout_daq.addWidget(self.QComboBox_send_trigger, 4, 4, 1, 1)
-        layout_daq.addWidget(self.QPushButton_send_trigger, 4, 5, 1, 1)
+        # layout_daq.addWidget(cw.LabelWidget(str('Web')), 0, 5, 1, 1)
+        # layout_daq.addWidget(self.QDoubleSpinBox_ttl_start_webcam, 1, 5, 1, 1)
+        # layout_daq.addWidget(self.QDoubleSpinBox_ttl_stop_webcam, 2, 5, 1, 1)
+        layout_daq.addWidget(cw.FrameWidget(), 3, 0, 1, 5)
+        layout_daq.addWidget(cw.LabelWidget(str('Sample Rate / KS/s')), 4, 0, 1, 1)
+        layout_daq.addWidget(self.QSpinBox_daq_sample_rate, 4, 1, 1, 1)
+        layout_daq.addWidget(self.QPushButton_plot_trigger, 4, 2, 1, 1)
+        layout_daq.addWidget(self.QComboBox_send_trigger, 4, 3, 1, 1)
+        layout_daq.addWidget(self.QPushButton_send_trigger, 4, 4, 1, 1)
         return layout_daq
 
     def _create_video_widgets(self):
@@ -507,14 +517,16 @@ class ConWidget(QtWidgets.QWidget):
     @QtCore.pyqtSlot(str)
     def load_selected_digital_timing_presets(self, text: str):
         values = self.digital_timing_presets.get(text, {})
+        self.QDoubleSpinBox_ttl_start_405.setValue(values.get("QDoubleSpinBox_ttl_start_off", 0))
+        self.QDoubleSpinBox_ttl_stop_405.setValue(values.get("QDoubleSpinBox_ttl_stop_off", 0))
         self.QDoubleSpinBox_ttl_start_405.setValue(values.get("QDoubleSpinBox_ttl_start_405", 0))
         self.QDoubleSpinBox_ttl_stop_405.setValue(values.get("QDoubleSpinBox_ttl_stop_405", 0))
         self.QDoubleSpinBox_ttl_start_488.setValue(values.get("QDoubleSpinBox_ttl_start_488", 0))
         self.QDoubleSpinBox_ttl_stop_488.setValue(values.get("QDoubleSpinBox_ttl_stop_488", 0))
         self.QDoubleSpinBox_ttl_start_thorcam.setValue(values.get("QDoubleSpinBox_ttl_start_thorcam", 0))
         self.QDoubleSpinBox_ttl_stop_thorcam.setValue(values.get("QDoubleSpinBox_ttl_stop_thorcam", 0))
-        self.QDoubleSpinBox_ttl_start_webcam.setValue(values.get("QDoubleSpinBox_ttl_start_webcam", 0))
-        self.QDoubleSpinBox_ttl_stop_webcam.setValue(values.get("QDoubleSpinBox_ttl_stop_webcam", 0))
+        # self.QDoubleSpinBox_ttl_start_webcam.setValue(values.get("QDoubleSpinBox_ttl_start_webcam", 0))
+        # self.QDoubleSpinBox_ttl_stop_webcam.setValue(values.get("QDoubleSpinBox_ttl_stop_webcam", 0))
 
     @QtCore.pyqtSlot(str)
     def save_digital_timing_preset(self, m: str):
@@ -526,14 +538,16 @@ class ConWidget(QtWidgets.QWidget):
             set_name = None
         if set_name:
             self.digital_timing_presets[set_name] = {
+                    "QDoubleSpinBox_ttl_start_off": self.QDoubleSpinBox_ttl_start_off.value(),
+                    "QDoubleSpinBox_ttl_stop_off": self.QDoubleSpinBox_ttl_stop_off.value(),
                     "QDoubleSpinBox_ttl_start_405": self.QDoubleSpinBox_ttl_start_405.value(),
                     "QDoubleSpinBox_ttl_stop_405": self.QDoubleSpinBox_ttl_stop_405.value(),
                     "QDoubleSpinBox_ttl_start_488": self.QDoubleSpinBox_ttl_start_488.value(),
                     "QDoubleSpinBox_ttl_stop_488": self.QDoubleSpinBox_ttl_stop_488.value(),
                     "QDoubleSpinBox_ttl_start_thorcam": self.QDoubleSpinBox_ttl_start_thorcam.value(),
-                    "QDoubleSpinBox_ttl_stop_thorcam": self.QDoubleSpinBox_ttl_stop_thorcam.value(),
-                    "QDoubleSpinBox_ttl_start_webcam": self.QDoubleSpinBox_ttl_start_webcam.value(),
-                    "QDoubleSpinBox_ttl_stop_webcam": self.QDoubleSpinBox_ttl_stop_webcam.value(),
+                    "QDoubleSpinBox_ttl_stop_thorcam": self.QDoubleSpinBox_ttl_stop_thorcam.value()
+                    # "QDoubleSpinBox_ttl_start_webcam": self.QDoubleSpinBox_ttl_start_webcam.value(),
+                    # "QDoubleSpinBox_ttl_stop_webcam": self.QDoubleSpinBox_ttl_stop_webcam.value(),
             }
             self.config.write_config(self.digital_timing_presets, self.config.configs["Digital Timing Presets"])
         else:

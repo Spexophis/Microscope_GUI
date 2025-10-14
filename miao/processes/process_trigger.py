@@ -3,19 +3,19 @@ import numpy as np
 
 class TriggerSequence:
     class TriggerParameters:
-        def __init__(self, sample_rate=1e5):
+        def __init__(self, sample_rate=2.5e5):
             # daq
             self.sample_rate = sample_rate  # Hz
             # digital triggers
-            self.digital_starts = [0.001, 0.002, 0.002]
-            self.digital_ends = [0.002, 0.004, 0.004]
+            self.digital_starts = [0.000, 0.0102, 0.0122, 0.0122]
+            self.digital_ends = [0.010, 0.010204, 0.013, 0.0162]
             self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
             self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
             # galvo scanner
             self.galvo_step_response = int(3.2e-4 * self.sample_rate)  # ~320 us
             self.galvo_return = int(8e-4 * self.sample_rate)  # ~800 us
             self.ramp_down_fraction = 0.02
-            self.ramp_down_offset = 160  # samples
+            self.ramp_down_offset = 50  # samples
             # galvo scan for read out
             self.galvo_origins = [1.2, 1.6]  # V
             self.galvo_ranges = [0.4, 0.4]  # V
@@ -24,9 +24,9 @@ class TriggerSequence:
             self.dot_ranges = [0.24, 0.24]  # V
             self.galvo_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
             self.dot_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
-            self.dot_step_s = 391  # samples
-            self.dot_step_v = 0.016  # volts
-            self.dot_step_y = 0.016  # volts
+            self.dot_step_s = 120  # samples
+            self.dot_step_v = 0.0185  # volts
+            self.dot_step_y = 0.0185  # volts
             self.up_rate = self.dot_step_v / self.dot_step_s
             self.dot_pos = np.arange(self.dot_starts[0], self.galvo_stops[0], self.dot_step_v)
             # sawtooth wave for read out
@@ -47,9 +47,9 @@ class TriggerSequence:
             self.dot_ranges_act = [0.24, 0.24]  # V
             self.galvo_stops_act = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.dot_ranges_act)]
             self.dot_starts_act = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.dot_ranges_act)]
-            self.dot_step_s_act = 391  # samples
-            self.dot_step_v_act = 0.016  # volts
-            self.dot_step_y_act = 0.016  # volts
+            self.dot_step_s_act = 120  # samples
+            self.dot_step_v_act = 0.0185  # volts
+            self.dot_step_y_act = 0.0185  # volts
             self.up_rate_act = self.dot_step_v_act / self.dot_step_s_act
             self.dot_pos_act = np.arange(self.dot_starts_act[0], self.galvo_stops_act[0], self.dot_step_v_act)
             # sawtooth wave for activation
@@ -64,6 +64,8 @@ class TriggerSequence:
             self.samples_delay_act = int(np.abs(self.dot_starts_act[0] - self.galvo_starts_act[0]) / self.up_rate_act)
             self.samples_offset_act = self.ramp_up_samples_act - self.samples_delay_act - self.dot_step_s_act * self.dot_pos_act.size
             # camera
+            self.frame_rate = 30
+            self.cycle_samples_min = int(np.ceil(self.sample_rate / self.frame_rate))
             self.initial_time = 0.001  # s
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
             self.standby_time = 0.002  # s
@@ -88,15 +90,15 @@ class TriggerSequence:
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
         return logging
 
-    def update_galvo_scan_parameters(self, origins=None, ranges=None, foci=None, offsets=None,
-                                     origins_act=None, ranges_act=None, foci_act=None, offsets_act=None):
+    def update_galvo_scan_parameters(self, origins=None, ranges=None, foci=None, offsets=None, samples_high=None,
+                                     origins_act=None, ranges_act=None, foci_act=None, offsets_act=None, samples_high_act=None):
         original_values = {"frequency": self.frequency, "galvo_origins": self.galvo_origins,
                            "galvo_ranges": self.galvo_ranges, "galvo_starts": self.galvo_starts,
                            "galvo_stops": self.galvo_stops, "galvo_offset": self.galvo_offsets,
                            "dot_ranges": self.dot_ranges, "dot_starts": self.dot_starts, "dot_step_v": self.dot_step_v,
                            "dot_step_s": self.dot_step_s, "dot_step_y": self.dot_step_y, "dot_pos": self.dot_pos,
                            "samples_low": self.samples_low, "samples_delay": self.samples_delay,
-                           "samples_offset": self.samples_offset,
+                           "samples_offset": self.samples_offset, "samples_high": self.samples_high,
                            "frequency_act": self.frequency_act, "galvo_origins_act": self.galvo_origins_act,
                            "galvo_ranges_act": self.galvo_ranges_act, "galvo_starts_act": self.galvo_starts_act,
                            "galvo_stops_act": self.galvo_stops_act, "galvo_offset_act": self.galvo_offsets_act,
@@ -104,7 +106,7 @@ class TriggerSequence:
                            "dot_step_v_act": self.dot_step_v_act, "dot_step_s_act": self.dot_step_s_act,
                            "dot_step_y_act": self.dot_step_y_act, "dot_pos_act": self.dot_pos_act,
                            "samples_low_act": self.samples_low_act, "samples_delay_act": self.samples_delay_act,
-                           "samples_offset_act": self.samples_offset_act}
+                           "samples_offset_act": self.samples_offset_act, "samples_high_act": self.samples_high_act}
         try:
             if origins is not None:
                 self.galvo_origins = origins
@@ -114,6 +116,10 @@ class TriggerSequence:
                 [self.dot_step_s, self.dot_step_v, self.dot_step_y] = foci
             if offsets is not None:
                 self.galvo_offsets = offsets
+            if samples_high is not None:
+                self.samples_high = samples_high
+
+            self.samples_low = self.dot_step_s - self.samples_high
             self.galvo_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
             self.galvo_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
             self.dot_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
@@ -140,6 +146,10 @@ class TriggerSequence:
                 [self.dot_step_s_act, self.dot_step_v_act, self.dot_step_y_act] = foci_act
             if offsets_act is not None:
                 self.galvo_offsets_act = offsets_act
+            if samples_high_act is not None:
+                self.samples_high_act = samples_high_act
+
+            self.samples_low_act = self.dot_step_s_act - self.samples_high_act
             self.galvo_starts_act = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.galvo_ranges_act)]
             self.galvo_stops_act = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.galvo_ranges_act)]
             self.dot_starts_act = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins_act, self.dot_ranges_act)]
@@ -189,12 +199,21 @@ class TriggerSequence:
             offset_samples = interval_samples - self.digital_starts[cam_ind]
             self.digital_starts = [(_start + offset_samples) for _start in self.digital_starts]
             self.digital_ends = [(_end + offset_samples) for _end in self.digital_ends]
-        cycle_samples = max(self.digital_ends[cam_ind] + self.standby_samples + 2,
+        cycle_samples = max(self.digital_ends[-1] + self.standby_samples + 2,
                             max([self.digital_ends[i] for i in digital_channels]))
+        cycle_samples = max(self.cycle_samples_min, cycle_samples)
         digital_trigger = np.zeros((len(digital_channels), cycle_samples), dtype=np.uint8)
         for ln, ch in enumerate(digital_channels):
-            digital_trigger[ln, self.digital_starts[ch]:self.digital_ends[ch]] = 1
-        return digital_trigger, digital_channels
+            digital_trigger[ln, self.digital_starts[ch + 1]:self.digital_ends[ch + 1]] = 1
+        if len(digital_channels) == 3 and 1 in lasers:
+            digital_trigger[1, self.digital_starts[0]:self.digital_ends[0]] = 1
+        for i in range(len(digital_channels)):
+            digital_trigger[i][-1] = 0
+        galvo_channels = [0, 1]
+        galvo_sequences = np.ones((len(galvo_channels), cycle_samples), dtype=np.uint16)
+        galvo_sequences[0] *= int(self.galvo_origins[0] * 4096 / 3.3)
+        galvo_sequences[1] *= int(self.galvo_origins[1] * 4096 / 3.3)
+        return digital_trigger, digital_channels, galvo_sequences, galvo_channels
 
     def generate_dot_scanning_triggers(self, lasers, camera):
         cam_ind = camera + 2
@@ -308,8 +327,9 @@ class TriggerSequence:
             digital_sequences[i] = np.append(dtr, dtr[-1] * np.ones(self.standby_samples))
         for i, gtr in enumerate(galvo_sequences):
             galvo_sequences[i] = np.append(gtr, gtr[-1] * np.ones(self.standby_samples))
+        for i in range(2):
+            galvo_sequences[i] = np.round(galvo_sequences[i] * 4096 / 3.3).astype(np.uint16)
         return np.asarray(digital_sequences), np.asarray(galvo_sequences), lasers
-
 
 def convert_list(arrays):
     if len(arrays) == 1:

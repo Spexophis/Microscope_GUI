@@ -9,17 +9,16 @@ class NucleoBoards:
 
     def __init__(self, logg=None):
         self.logg = logg or self.setup_logging()
-        self.com_port = "COM8"
+        self.com_port = "COM12"
         self.ser = serial.Serial(self.com_port, 115200, timeout=1)
         self.prescaler = 0
         self.period = 63
         self.sample_rate = 64e6/(self.prescaler + 1) * (self.period + 1)
         self.sequence_length = 64000  # must match firmware
         self.t = 0.1 * max((1e6 / self.sample_rate), 1)
-        self.digital_sequences = []
-        self.analog_sequences = []
         self.trg_thread = None
         self.infinity = False
+        self.send_command("CLOCK 63 3")
 
     @staticmethod
     def setup_logging():
@@ -61,49 +60,40 @@ class NucleoBoards:
     def write_digital_sequences(self, digital_sequences, indices=[0, 1, 2]):
         if isinstance(digital_sequences, np.ndarray):
             digital_sequences = digital_sequences.tolist()
-        if digital_sequences == self.digital_sequences:
-            return
+        if len(digital_sequences) == len(indices):
+            try:
+                for seq, idx in zip(digital_sequences, indices):
+                    dfn = self.sequence_length - len(seq)
+                    if dfn > 0:
+                        data = seq
+                    else:
+                        data = seq[:self.sequence_length]
+                    self.send_sequence(idx, data, dtype="B")  # Digital PA0
+                    time.sleep(0.1)
+            except RuntimeError as e:
+                self.logg.error("GPIO channels writing error: %s", e)
         else:
-            if len(digital_sequences) == len(indices):
-                try:
-                    for seq, idx in zip(digital_sequences, indices):
-                        dfn = self.sequence_length - len(seq)
-                        if dfn > 0:
-                            temp = [seq[-1]] * dfn
-                            data = seq
-                            data.extend(temp)
-                        else:
-                            data = seq[:self.sequence_length]
-                        self.send_sequence(idx, data, dtype="B")  # Digital PA0
-                        time.sleep(0.1)
-                except RuntimeError as e:
-                    self.logg.error("GPIO channels writing error: %s", e)
-            else:
-                self.logg.error("GPIO channels error")
-                return
-        self.digital_sequences = digital_sequences
+            self.logg.error("GPIO channels error")
+            return
 
     def write_galvo_sequences(self, galvo_sequences, indices=[3, 4]):
         if isinstance(galvo_sequences, np.ndarray):
             galvo_sequences = galvo_sequences.tolist()
-        if galvo_sequences == self.analog_sequences:
-            return
+        if len(galvo_sequences) == len(indices):
+            try:
+                for seq, idx in zip(galvo_sequences, indices):
+                    dfn = self.sequence_length - len(seq)
+                    if dfn > 0:
+                        data = seq
+                    else:
+                        data = seq[:self.sequence_length]
+                    self.send_sequence(idx, data, dtype="H")  # DAC1
+                    time.sleep(0.1)
+            except RuntimeError as e:
+                self.logg.error("DAC channels writing error: %s", e)
         else:
-            if len(galvo_sequences) == len(indices):
-                try:
-                    for seq, idx in zip(galvo_sequences, indices):
-                        dfn = self.sequence_length - len(seq)
-                        if dfn > 0:
-                            temp = [seq[-1]] * dfn
-                            data = seq
-                            data.extend(temp)
-                        else:
-                            data = seq[:self.sequence_length]
-                        self.send_sequence(idx, data, dtype="H")  # DAC1
-                        time.sleep(0.1)
-                except RuntimeError as e:
-                    self.logg.error("DAC channels writing error: %s", e)
-        self.analog_sequences = galvo_sequences
+            self.logg.error("GPIO channels error")
+            return
 
     def write_triggers(self, galvo_sequences=None, galvo_channels=None, digital_sequences=None, digital_channels=None, infinity=True):
         try:

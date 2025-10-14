@@ -174,14 +174,14 @@ class MainController(QtCore.QObject):
     def reset_galvo_positions(self):
         g_x, g_y = self.con_controller.get_galvo_positions()
         try:
-            self.m.nucleo.set_galvo_position([g_x, g_y], [0, 1])
+            self.m.nucleo.set_galvo_position([g_x, g_y])
         except Exception as e:
             self.logg.error(f"Galvo Error: {e}")
 
     @QtCore.pyqtSlot(float, float)
     def set_galvo(self, voltx: float, volty: float):
         try:
-            self.m.nucleo.set_galvo_position([voltx, volty], [0, 1])
+            self.m.nucleo.set_galvo_position([voltx, volty])
         except Exception as e:
             self.logg.error(f"Galvo Error: {e}")
 
@@ -253,19 +253,12 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters("imaging")
         vd_mod = self.con_controller.get_live_mode()
         if vd_mod == "Wide Field":
-            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
-            rpn = self.m.nucleo.signal_length // dtr.shape[1]
-            if rpn > 1:
-                dtr = np.tile(dtr, (1, rpn))
-            g_x, g_y = self.con_controller.get_galvo_positions()
-            gtr = np.ones((2, self.m.nucleo.signal_length))
-            gtr[0] = gtr[0] * g_x
-            gtr[1] = gtr[1] * g_y
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=True)
+            dtr, dchs, gtr, gchs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=dchs, infinity=True)
         elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=True)
         else:
             raise ValueError("Invalid video mode")
@@ -276,21 +269,13 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters("imaging")
         acq_mod = self.con_controller.get_acquisition_mode()
         if "Wide Field" in acq_mod:
-            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
-            rpn = self.m.nucleo.signal_length // dtr.shape[1]
-            self.m.cam_set[self.cameras["imaging"]].acq_num = rpn
-            if rpn > 1:
-                dtr = np.tile(dtr, (1, rpn))
-            g_x, g_y = self.con_controller.get_galvo_positions()
-            gtr = np.ones((2, self.m.nucleo.signal_length))
-            gtr[0] = gtr[0] * g_x
-            gtr[1] = gtr[1] * g_y
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+            dtr, dchs, gtr, gchs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=dchs, infinity=False)
         elif "Dot Scan" in acq_mod:
             self.m.cam_set[self.cameras["imaging"]].acq_num = 1
             dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
         else:
             raise ValueError("Invalid acquisition mode")
@@ -301,30 +286,23 @@ class MainController(QtCore.QObject):
         self.update_trigger_parameters("imaging")
         vd_mod = self.con_controller.get_live_mode()
         if vd_mod == "Wide Field":
-            dtr, chs = self.p.trigger.generate_digital_triggers([0, 1], self.cameras["imaging"])
-            rpn = self.m.nucleo.signal_length // dtr.shape[1]
-            if rpn > 1:
-                dtr = np.pad(dtr, ((0, 0), (0, dtr.shape[1] * (rpn - 1))), 'constant', constant_values=((0, 0), (0, 0)))
-            g_x, g_y = self.con_controller.get_galvo_positions()
-            gtr = np.ones((2, self.m.nucleo.signal_length))
-            gtr[0] = gtr[0] * g_x
-            gtr[1] = gtr[1] * g_y
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
+            dtr, dchs, gtr, gchs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=dchs, infinity=False)
         elif vd_mod == "Dot Scan":
             dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
-            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[0, 1],
-                                         digital_sequences=dtr, digital_channels=chs, infinity=True)
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=chs, infinity=False)
         else:
             raise ValueError("Invalid video mode")
 
     @QtCore.pyqtSlot()
     def update_galvo_scanner(self):
-        galvo_positions, galvo_ranges, dot_pos, offset, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act = self.con_controller.get_galvo_scan_parameters()
+        galvo_positions, galvo_ranges, dot_pos, offset, high_samples, galvo_positions_act, galvo_ranges_act, dot_pos_act, offset_act, high_samples_act = self.con_controller.get_galvo_scan_parameters()
         self.p.trigger.update_galvo_scan_parameters(origins=galvo_positions, ranges=galvo_ranges,
-                                                    foci=dot_pos, offsets=offset,
+                                                    foci=dot_pos, offsets=offset, samples_high=high_samples,
                                                     origins_act=galvo_positions_act, ranges_act=galvo_ranges_act,
-                                                    foci_act=dot_pos_act, offsets_act=offset_act)
+                                                    foci_act=dot_pos_act, offsets_act=offset_act, samples_high_act=high_samples_act)
         self.con_controller.display_frequency(self.p.trigger.frequency, self.p.trigger.frequency_act)
 
     def update_trigger_parameters(self, cam_key):
@@ -345,6 +323,8 @@ class MainController(QtCore.QObject):
         self.lasers = [0, 1]
         self.set_lasers(self.lasers)
         self.set_camera_roi("imaging")
+        t = self.con_controller.get_thorcam_expo()
+        self.m.cam_set[self.cameras["imaging"]].t_exposure = t
         self.m.cam_set[self.cameras["imaging"]].prepare_live()
         self.setup_video_thread()
 
@@ -466,7 +446,7 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def plot_trigger(self):
         try:
-            dtr, dch = self.generate_live_triggers("imaging")
+            dtr, dch, gtr, gch = self.generate_live_triggers("imaging")
             self.view_controller.plot_update(dtr[0])
             for i in range(dtr.shape[0] - 1):
                 self.view_controller.plot(dtr[i + 1] + i + 1)
@@ -487,10 +467,6 @@ class MainController(QtCore.QObject):
             self.run_widefield(acq_num)
         elif acq_mod == "Dot Scan 2D":
             self.run_dot_scan(acq_num)
-        elif acq_mod == "Point Scan 2D":
-            self.run_point_scan(acq_num)
-        elif acq_mod == "FocArr Scan 2D":
-            self.run_focal_array_scan()
         else:
             self.logg.error(f"Invalid video mode")
 
@@ -513,11 +489,12 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].acq_num = 1
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         # self.update_trigger_parameters("imaging")
         # dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
-        # self.m.nucleo.set_piezo_position(pos=[ptr[0]], indices=[2])
         # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        # self.m.nucleo.set_piezo_position(pos=[ptr[0]], indices=[2])
         # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
         #                              digital_sequences=dtr, digital_channels=dch, infinity=False)
 
@@ -529,10 +506,11 @@ class MainController(QtCore.QObject):
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            time.sleep(0.02)
             self.m.nucleo.run_triggers()
-            time.sleep(1 + self.m.nucleo.signal_length * 10 / 1e6)
+            time.sleep(0.3)
             self.dm_cmd_ind = self.m.dm.current_cmd
-            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield_zstack',
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield',
                            self.m.cam_set[self.cameras["imaging"]].get_data(),
                            list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
         except Exception as e:
@@ -559,6 +537,7 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].acq_num = 1
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         # self.update_trigger_parameters("imaging")
         # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
@@ -577,7 +556,7 @@ class MainController(QtCore.QObject):
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             time.sleep(0.02)
             self.m.nucleo.run_triggers()
-            time.sleep(1 + self.m.nucleo.signal_length * 10 / 1e6)
+            time.sleep(1 + self.m.nucleo.sequence_length * 10 / 1e6)
             self.dm_cmd_ind = self.m.dm.current_cmd
             self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_dot_scanning',
                            self.m.cam_set[self.cameras["imaging"]].get_data(),
@@ -899,8 +878,8 @@ class MainController(QtCore.QObject):
         self.set_img_wfs(self.cameras["wfs"])
         self.update_trigger_parameters("wfs")
         self.dfm.ctrl.reset_control()
-        dtr, sw, chs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
-        self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=chs, finite=True)
+        dtr, dchs, gtr, gchs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["wfs"])
+        self.m.nucleo.write_triggers(digital_sequences=dtr, digital_channels=dchs, finite=True)
 
     def close_loop_correction(self):
         try:
@@ -967,7 +946,7 @@ class MainController(QtCore.QObject):
             self.dfm.set_dm(dmsp)
             time.sleep(0.016)
             self.m.nucleo.run_triggers()
-            time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
+            time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
             ims.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
         return ims
 
@@ -1001,7 +980,7 @@ class MainController(QtCore.QObject):
                 images = []
                 for i in range(8):
                     self.m.nucleo.run_triggers()
-                    time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
+                    time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
                     images.append(self.m.cam_set[self.cameras["imaging"]].get_last_image())
                 if mf == "Max(Intensity)":
                     mts = [img.max() for img in images]
@@ -1020,7 +999,7 @@ class MainController(QtCore.QObject):
                 tf.imwrite(str(fn), np.asarray(images))
             else:
                 self.m.nucleo.run_triggers()
-                time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
+                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
                 fn = new_folder + r"\original.tiff"
                 tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             for mode in range(mode_start, mode_stop + 1):
@@ -1065,7 +1044,7 @@ class MainController(QtCore.QObject):
             self.dfm.set_dm(cmd)
             time.sleep(0.016)
             self.m.nucleo.run_triggers()
-            time.sleep(self.m.nucleo.signal_length * 10 / 1e6)
+            time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
             fn = new_folder + r"\final.tiff"
             tf.imwrite(str(fn), self.m.cam_set[self.cameras["imaging"]].get_last_image())
             self.dfm.dm_cmd.append(cmd)

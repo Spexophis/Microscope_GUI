@@ -2261,6 +2261,46 @@ class HamamatsuCamera:
             self.logg.info("Set READOUT SPEED: Fast")
         else:
             self.logg.error("Failed to Set READOUT SPEED: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['OUTPUT TRIGGER KIND[0]'], 2)
+        if re is not False:
+            self.logg.info("Set OUTPUT TRIGGER KIND: GLOBAL EXPOSURE")
+        else:
+            self.logg.error("Failed to Set OUTPUT TRIGGER KIND: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['OUTPUT TRIGGER POLARITY[0]'], 2)
+        if re is not False:
+            self.logg.info("Set OUTPUT TRIGGER POLARITY: POSITIVE")
+        else:
+            self.logg.error("Failed to Set OUTPUT TRIGGER POLARITY: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER SOURCE'], 2)
+        if re is not False:
+            self.logg.info("Set TRIGGER SOURCE: External")
+        else:
+            self.logg.error("Failed to Set TRIGGER SOURCE: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER POLARITY'], 2)
+        if re is not False:
+            self.logg.info("Set TRIGGER POLARITY: POSITIVE")
+        else:
+            self.logg.error("Failed to Set TRIGGER POLARITY: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['SENSOR MODE'], 1)
+        if re is not False:
+            self.logg.info("Set SENSOR MODE: AREA")
+        else:
+            self.logg.error("Failed to Set SENSOR MODE: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER MODE'], 1)
+        if re is not False:
+            self.logg.info("Set TRIGGER MODE: Normal")
+        else:
+            self.logg.error("Failed to Set TRIGGER MODE: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER ACTIVE'], 1)
+        if re is not False:
+            self.logg.info("Set TRIGGER ACTIVE: EDGE")
+        else:
+            self.logg.error("Failed to Set TRIGGER ACTIVE: {}".format(Dcamapi.lasterr()))
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER GLOBAL EXPOSURE'], 5)
+        if re is not False:
+            self.logg.info("Set TRIGGER GLOBAL EXPOSURE: GLOBAL RESET")
+        else:
+            self.logg.error("Failed to Set TRIGGER GLOBAL EXPOSURE: {}".format(Dcamapi.lasterr()))
 
     def close(self):
         re = self.dcam.dev_close()
@@ -2308,70 +2348,16 @@ class HamamatsuCamera:
             self.bin_h, self.bin_v = 1, 1
         self.img_size = self.pixels_x * self.pixels_y
 
+    def set_exposure(self):
+        re = self.dcam.prop_setgetvalue(self.properties['EXPOSURE TIME'], self.t_exposure)
+        if re is not False:
+            self.logg.info(f"Set EXPOSURE TIME: {re}")
+        else:
+            self.logg.error("Failed to Set EXPOSURE TIME {}".format(Dcamapi.lasterr()))
+
     def prepare_live(self):
         self.buffer_size = 8
-        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER SOURCE'], 2)
-        if re is not False:
-            self.logg.info("Set TRIGGER SOURCE: External")
-        else:
-            self.logg.error("Failed to Set TRIGGER SOURCE: {}".format(Dcamapi.lasterr()))
-        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER POLARITY'], 2)
-        if re is not False:
-            self.logg.info("Set TRIGGER POLARITY: POSITIVE")
-        else:
-            self.logg.error("Failed to Set TRIGGER POLARITY: {}".format(Dcamapi.lasterr()))
-        if self.mode == "Normal":
-            re = self.dcam.prop_setgetvalue(self.properties['SENSOR MODE'], 1)
-            if re is not False:
-                self.logg.info("Set SENSOR MODE: AREA")
-            else:
-                self.logg.error("Failed to Set SENSOR MODE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER MODE'], 1)
-            if re is not False:
-                self.logg.info("Set TRIGGER MODE: Normal")
-            else:
-                self.logg.error("Failed to Set TRIGGER MODE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER ACTIVE'], 2)
-            if re is not False:
-                self.logg.info("Set TRIGGER ACTIVE: LEVEL")
-            else:
-                self.logg.error("Failed to Set TRIGGER ACTIVE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER GLOBAL EXPOSURE'], 5)
-            if re is not False:
-                self.logg.info("Set TRIGGER GLOBAL EXPOSURE: GLOBAL RESET")
-            else:
-                self.logg.error("Failed to Set TRIGGER GLOBAL EXPOSURE: {}".format(Dcamapi.lasterr()))
-        if self.mode == "LightSheet":
-            re = self.dcam.prop_setgetvalue(self.properties['SENSOR MODE'], 12)
-            if re is not False:
-                self.logg.info("Set SENSOR MODE: AREA")
-            else:
-                self.logg.error("Failed to Set SENSOR MODE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER MODE'], 6)
-            if re is not False:
-                self.logg.info("Set TRIGGER MODE: Normal")
-            else:
-                self.logg.error("Failed to Set TRIGGER MODE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER ACTIVE'], 1)
-            if re is not False:
-                self.logg.info("Set TRIGGER ACTIVE: LEVEL")
-            else:
-                self.logg.error("Failed to Set TRIGGER ACTIVE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['TRIGGER GLOBAL EXPOSURE'], 3)
-            if re is not False:
-                self.logg.info("Set TRIGGER GLOBAL EXPOSURE: GLOBAL RESET")
-            else:
-                self.logg.error("Failed to Set TRIGGER GLOBAL EXPOSURE: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['INTERNAL LINE INTERVAL'], self.line_interval)
-            if re is not False:
-                self.logg.info("Set INTERNAL LINE INTERVAL: {}".format(re))
-            else:
-                self.logg.error("Failed to Set INTERNAL LINE INTERVAL: {}".format(Dcamapi.lasterr()))
-            re = self.dcam.prop_setgetvalue(self.properties['EXPOSURE TIME'], self.line_exposure)
-            if re is not False:
-                self.logg.info("Set EXPOSURE TIME: {}".format(re))
-            else:
-                self.logg.error("Failed to Set EXPOSURE TIME: {}".format(Dcamapi.lasterr()))
+        self.set_exposure()
 
     def start_live(self):
         re = self.dcam.buf_alloc(self.buffer_size)
@@ -2427,7 +2413,7 @@ class HamamatsuCamera:
             return None
 
     def prepare_data_acquisition(self):
-        self.buffer_size = self.acq_num
+        self.buffer_size = 8
         re = self.dcam.prop_setgetvalue(self.properties['TRIGGER SOURCE'], 2)
         if re is not False:
             self.logg.info("Set TRIGGER SOURCE: External")
@@ -2496,7 +2482,7 @@ class HamamatsuCamera:
         if re is False:
             self.logg.error('Error: Failed to buf_alloc with error {}'.format(self.dcam.lasterr().name))
             return False
-        self.data = DataList(self.buffer_size)
+        self.data = DataList(self.acq_num)
         self.acq_thread = AcquisitionThread(self)
         re = self.dcam.cap_start(self.is_sequence)
         if re:

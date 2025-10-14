@@ -43,14 +43,14 @@ class ConController:
         return detection_device
 
     def get_digital_parameters(self):
-        digital_starts = [self.v.QDoubleSpinBox_ttl_start_405.value(),
+        digital_starts = [self.v.QDoubleSpinBox_ttl_start_off.value(),
+                          self.v.QDoubleSpinBox_ttl_start_405.value(),
                           self.v.QDoubleSpinBox_ttl_start_488.value(),
-                          self.v.QDoubleSpinBox_ttl_start_thorcam.value(),
-                          self.v.QDoubleSpinBox_ttl_start_webcam.value()]
-        digital_ends = [self.v.QDoubleSpinBox_ttl_stop_405.value(),
+                          self.v.QDoubleSpinBox_ttl_start_thorcam.value()]
+        digital_ends = [self.v.QDoubleSpinBox_ttl_stop_off.value(),
+                        self.v.QDoubleSpinBox_ttl_stop_405.value(),
                         self.v.QDoubleSpinBox_ttl_stop_488.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_thorcam.value(),
-                        self.v.QDoubleSpinBox_ttl_stop_webcam.value()]
+                        self.v.QDoubleSpinBox_ttl_stop_thorcam.value()]
         return digital_starts, digital_ends
 
     def get_piezo_scan_parameters(self):
@@ -70,6 +70,7 @@ class ConController:
         dot_pos = [self.v.QSpinBox_dot_step_x.value(), self.v.QDoubleSpinBox_dot_step_x.value(),
                    self.v.QDoubleSpinBox_dot_step_y.value()]
         offsets = [self.v.QDoubleSpinBox_galvo_offset_x.value(), self.v.QDoubleSpinBox_galvo_offset_y.value()]
+        high_samples = self.v.QDoubleSpinBox_sample_high.value()
         galvo_positions_act = [self.v.QDoubleSpinBox_galvo_x_act.value(), self.v.QDoubleSpinBox_galvo_y_act.value()]
         galvo_ranges_act = [
             [self.v.QDoubleSpinBox_galvo_range_x_act.value(), self.v.QDoubleSpinBox_galvo_range_y_act.value()],
@@ -77,8 +78,9 @@ class ConController:
         dot_pos_act = [self.v.QSpinBox_dot_step_x_act.value(), self.v.QDoubleSpinBox_dot_step_x_act.value(),
                        self.v.QDoubleSpinBox_dot_step_y_act.value()]
         offsets_act = [self.v.QDoubleSpinBox_galvo_offset_x_act.value(), self.v.QDoubleSpinBox_galvo_offset_y_act.value()]
-        return (galvo_positions, galvo_ranges, dot_pos, offsets,
-                galvo_positions_act, galvo_ranges_act, dot_pos_act, offsets_act)
+        high_samples_act = self.v.QDoubleSpinBox_sample_high_act.value()
+        return (galvo_positions, galvo_ranges, dot_pos, offsets, high_samples,
+                galvo_positions_act, galvo_ranges_act, dot_pos_act, offsets_act, high_samples_act)
 
     def change_galvo_scan(self, x=None, y=None):
         if x is not None:

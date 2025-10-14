@@ -32,7 +32,7 @@ class MainModule:
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         try:
-            self.nucleo = module_nucleo.NucleoBoards(logg=self.logg.error_log, config=self.config)
+            self.nucleo = module_nucleo.NucleoBoards(logg=self.logg.error_log)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")
