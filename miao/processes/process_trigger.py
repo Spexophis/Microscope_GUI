@@ -7,8 +7,8 @@ class TriggerSequence:
             # daq
             self.sample_rate = sample_rate  # Hz
             # digital triggers
-            self.digital_starts = [0.000, 0.0102, 0.0122, 0.0122]
-            self.digital_ends = [0.010, 0.010204, 0.013, 0.0162]
+            self.digital_starts = [0.000000, 0.010100, 0.010140, 0.010100]
+            self.digital_ends = [0.010000, 0.010104, 0.010640, 0.011100]
             self.digital_starts = [int(digital_start * self.sample_rate) for digital_start in self.digital_starts]
             self.digital_ends = [int(digital_end * self.sample_rate) for digital_end in self.digital_ends]
             # galvo scanner
@@ -17,16 +17,16 @@ class TriggerSequence:
             self.ramp_down_fraction = 0.02
             self.ramp_down_offset = 50  # samples
             # galvo scan for read out
-            self.galvo_origins = [1.2, 1.6]  # V
-            self.galvo_ranges = [0.4, 0.4]  # V
+            self.galvo_origins = [1.0, 1.465]  # V
+            self.galvo_ranges = [4.0, 4]  # V
             self.galvo_offsets = [0.000, 0.000]  # V
             self.galvo_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
-            self.dot_ranges = [0.24, 0.24]  # V
+            self.dot_ranges = [2.0, 0.45]  # V
             self.galvo_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
             self.dot_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.dot_ranges)]
-            self.dot_step_s = 120  # samples
-            self.dot_step_v = 0.0185  # volts
-            self.dot_step_y = 0.0185  # volts
+            self.dot_step_s = 15  # samples
+            self.dot_step_v = 1.0  # volts
+            self.dot_step_y = 0.03  # volts
             self.up_rate = self.dot_step_v / self.dot_step_s
             self.dot_pos = np.arange(self.dot_starts[0], self.galvo_stops[0], self.dot_step_v)
             # sawtooth wave for read out
@@ -70,7 +70,7 @@ class TriggerSequence:
             self.initial_samples = int(np.ceil(self.initial_time * self.sample_rate))
             self.standby_time = 0.002  # s
             self.standby_samples = int(np.ceil(self.standby_time * self.sample_rate))
-            self.exposure_time = 0.02  # s
+            self.exposure_time = 0.001  # s
             self.exposure_samples = int(np.ceil(self.exposure_time / self.sample_rate))
             self.trigger_pulse_width = 50e-6  # s
             self.trigger_pulse_samples = int(np.ceil(self.trigger_pulse_width * self.sample_rate))
@@ -330,6 +330,25 @@ class TriggerSequence:
         for i in range(2):
             galvo_sequences[i] = np.round(galvo_sequences[i] * 4096 / 3.3).astype(np.uint16)
         return np.asarray(digital_sequences), np.asarray(galvo_sequences), lasers
+
+    def generate_line_scanning_triggers(self, lasers, camera):
+        digital_trigger, digital_channels, galvo_steps, galvo_channels = self.generate_digital_triggers(lasers, camera)
+        x_pos = np.arange(self.dot_starts[0], self.galvo_stops[0] + 0.0001, self.dot_step_v)
+        y_pos = np.arange(self.dot_starts[1], self.galvo_stops[1], self.dot_step_y)
+        step_length = digital_trigger.shape[1]
+        if self.galvo_step_response > self.standby_samples:
+            offset = self.galvo_step_response - self.standby_samples
+        galvo_start = self.digital_ends[-1] + int(32e-6 * self.sample_rate)
+        pos = x_pos.shape[0] * y_pos.shape[0]
+        digital_triggers = np.tile(digital_trigger, (1, pos))
+        galvo_sequences = np.ones((len(galvo_channels), digital_triggers.shape[1]), dtype=np.float16)
+        galvo_sequences[0] = np.repeat(x_pos, step_length)
+        galvo_sequences[1] = np.repeat(y_pos, step_length)
+        shifts = step_length - galvo_start
+        galvo_sequences[0] = shift_array(galvo_sequences[0], shifts, fill=None, direction='backward')
+        galvo_sequences[1] = shift_array(galvo_sequences[1], shifts, fill=None, direction='backward')
+        return digital_triggers, digital_channels, galvo_sequences, galvo_channels, pos
+
 
 def convert_list(arrays):
     if len(arrays) == 1:

@@ -258,6 +258,8 @@ class MainController(QtCore.QObject):
                                          digital_sequences=dtr, digital_channels=dchs, infinity=True)
         elif vd_mod == "Dot Scan":
             dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.t = dtr.shape[1] / self.m.nucleo.sample_rate
+            print(self.m.nucleo.t)
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=True)
         else:
@@ -274,9 +276,13 @@ class MainController(QtCore.QObject):
                                          digital_sequences=dtr, digital_channels=dchs, infinity=False)
         elif "Dot Scan" in acq_mod:
             self.m.cam_set[self.cameras["imaging"]].acq_num = 1
-            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers(self.lasers, self.cameras["imaging"])
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
+        elif "Line Scan" in acq_mod:
+            dtr, dchs, gtr, gchs = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=dchs, infinity=False)
         else:
             raise ValueError("Invalid acquisition mode")
 
@@ -290,7 +296,7 @@ class MainController(QtCore.QObject):
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=dchs, infinity=False)
         elif vd_mod == "Dot Scan":
-            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers([1], self.cameras["imaging"])
+            dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers(self.lasers, self.cameras["imaging"])
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=False)
         else:
@@ -467,6 +473,8 @@ class MainController(QtCore.QObject):
             self.run_widefield(acq_num)
         elif acq_mod == "Dot Scan 2D":
             self.run_dot_scan(acq_num)
+        elif acq_mod == "Line Scan 2D":
+            self.run_line_scan(acq_num)
         else:
             self.logg.error(f"Invalid video mode")
 
@@ -579,6 +587,76 @@ class MainController(QtCore.QObject):
     def run_dot_scan(self, n: int):
         self.v.get_dialog()
         self.run_task(task=self.dot_scan, iteration=n)
+
+    def prepare_line_scan(self):
+        dot_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.p.trigger.galvo_origins, self.p.trigger.dot_ranges)]
+        x_pos = np.arange(self.p.trigger.dot_starts[0], dot_stops[0] + 0.0001, self.p.trigger.dot_step_v)
+        y_pos = np.arange(self.p.trigger.dot_starts[1], dot_stops[1], self.p.trigger.dot_step_y)
+        pos = x_pos.shape[0] * y_pos.shape[0]
+        gtrs = []
+        for xp in x_pos:
+            for yp in y_pos:
+                gtr = np.ones((2, self.m.nucleo.sequence_length), dtype=np.uint16)
+                gtr[0] *= int(xp * 4096 / 3.3)
+                gtr[1] *= int(yp * 4096 / 3.3)
+                gtrs.append(gtr)
+        # print(self.p.trigger.galvo_origins)
+        # print(self.p.trigger.dot_ranges)
+        # print(self.p.trigger.dot_starts)
+        # print(self.p.trigger.dot_step_v, self.p.trigger.dot_step_y)
+        # print(pos)
+        # print(x_pos)
+        # print(y_pos)
+        # self.lasers = self.con_controller.get_lasers()
+        self.set_lasers(self.lasers)
+        # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+        self.set_camera_roi("imaging")
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+        # self.update_trigger_parameters("imaging")
+        # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
+        # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
+        #                           galvo_sequences=gtr, galvo_channels=[0, 1, 2],
+        #                           digital_sequences=dtr, digital_channels=chs)
+        return gtrs
+
+    def line_scan(self):
+        try:
+            gtrs = self.prepare_line_scan()
+        except Exception as e:
+            self.logg.error(f"Error preparing galvo line scanning: {e}")
+            return
+        try:
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            for gtr in gtrs:
+                # print(gtr[:, 0])
+                self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
+                time.sleep(0.02)
+                self.m.nucleo.run_triggers()
+                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            self.dm_cmd_ind = self.m.dm.current_cmd
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_line_scanning',
+                                   self.m.cam_set[self.cameras["imaging"]].get_data(),
+                                   list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
+        except Exception as e:
+            self.finish_line_scan()
+            self.logg.error(f"Error running line scanning: {e}")
+            return
+        self.finish_line_scan()
+
+    def finish_line_scan(self):
+        try:
+            self.m.cam_set[self.cameras["imaging"]].stop_data_acquisition()
+            self.m.nucleo.stop_triggers()
+            self.lasers_off()
+            self.logg.info("Line scanning image acquired")
+        except Exception as e:
+            self.logg.error(f"Error stopping line scanning: {e}")
+
+    def run_line_scan(self, n: int):
+        self.v.get_dialog()
+        self.run_task(task=self.line_scan, iteration=n)
 
     @QtCore.pyqtSlot(int, float)
     def push_actuator(self, n: int, a: float):

@@ -2291,9 +2291,9 @@ class HamamatsuCamera:
             self.logg.info("Set TRIGGER MODE: Normal")
         else:
             self.logg.error("Failed to Set TRIGGER MODE: {}".format(Dcamapi.lasterr()))
-        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER ACTIVE'], 1)
+        re = self.dcam.prop_setgetvalue(self.properties['TRIGGER ACTIVE'], 2)
         if re is not False:
-            self.logg.info("Set TRIGGER ACTIVE: EDGE")
+            self.logg.info("Set TRIGGER ACTIVE: LEVEL")
         else:
             self.logg.error("Failed to Set TRIGGER ACTIVE: {}".format(Dcamapi.lasterr()))
         re = self.dcam.prop_setgetvalue(self.properties['TRIGGER GLOBAL EXPOSURE'], 5)
@@ -2357,13 +2357,12 @@ class HamamatsuCamera:
 
     def prepare_live(self):
         self.buffer_size = 8
-        self.set_exposure()
-
-    def start_live(self):
         re = self.dcam.buf_alloc(self.buffer_size)
         if re is False:
             self.logg.error('Error: Failed to buf_alloc with error {}'.format(self.dcam.lasterr().name))
             return False
+
+    def start_live(self):
         self.data = DataList(self.buffer_size)
         self.acq_thread = AcquisitionThread(self)
         re = self.dcam.cap_start(self.is_sequence)
@@ -2413,7 +2412,7 @@ class HamamatsuCamera:
             return None
 
     def prepare_data_acquisition(self):
-        self.buffer_size = 8
+        self.buffer_size = self.acq_num
         re = self.dcam.prop_setgetvalue(self.properties['TRIGGER SOURCE'], 2)
         if re is not False:
             self.logg.info("Set TRIGGER SOURCE: External")

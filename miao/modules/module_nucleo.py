@@ -11,10 +11,11 @@ class NucleoBoards:
         self.logg = logg or self.setup_logging()
         self.com_port = "COM12"
         self.ser = serial.Serial(self.com_port, 115200, timeout=1)
-        self.prescaler = 0
-        self.period = 63
-        self.sample_rate = 64e6/(self.prescaler + 1) * (self.period + 1)
-        self.sequence_length = 64000  # must match firmware
+        self.prescaler = 63
+        self.period = 3
+        self.sample_rate = 64e6/((self.prescaler + 1) * (self.period + 1))
+        self.sequence_length = 64000
+        self.sequence_length_max = 64000  # must match firmware
         self.t = 0.1 * max((1e6 / self.sample_rate), 1)
         self.trg_thread = None
         self.infinity = False
@@ -47,7 +48,7 @@ class NucleoBoards:
     def set_rate(self, prescaler, period):
         self.prescaler = prescaler
         self.period = period
-        self.sample_rate = 64/(self.prescaler + 1) * (self.period + 1)
+        self.sample_rate = 64e6/((self.prescaler + 1) * (self.period + 1))
         self.t = 0.1 * max((1e6 / self.sample_rate), 1)
         cmd = f"CLOCK {prescaler} {period}"
         self.send_command(cmd)
@@ -63,11 +64,12 @@ class NucleoBoards:
         if len(digital_sequences) == len(indices):
             try:
                 for seq, idx in zip(digital_sequences, indices):
-                    dfn = self.sequence_length - len(seq)
+                    dfn = self.sequence_length_max - len(seq)
                     if dfn > 0:
                         data = seq
+                        self.sequence_length = len(seq)
                     else:
-                        data = seq[:self.sequence_length]
+                        data = seq[:self.sequence_length_max]
                     self.send_sequence(idx, data, dtype="B")  # Digital PA0
                     time.sleep(0.1)
             except RuntimeError as e:
@@ -82,11 +84,12 @@ class NucleoBoards:
         if len(galvo_sequences) == len(indices):
             try:
                 for seq, idx in zip(galvo_sequences, indices):
-                    dfn = self.sequence_length - len(seq)
+                    dfn = self.sequence_length_max - len(seq)
                     if dfn > 0:
                         data = seq
+                        self.sequence_length = len(seq)
                     else:
-                        data = seq[:self.sequence_length]
+                        data = seq[:self.sequence_length_max]
                     self.send_sequence(idx, data, dtype="H")  # DAC1
                     time.sleep(0.1)
             except RuntimeError as e:
@@ -112,7 +115,7 @@ class NucleoBoards:
             self.logg.info("Trigger starts infinitely")
         else:
             self.send_command("START")
-            time.sleep(self.sequence_length / self.sample_rate)
+            time.sleep(self.sequence_length_max / self.sample_rate)
             self.logg.info("Trigger runs once")
 
     def stop_triggers(self):

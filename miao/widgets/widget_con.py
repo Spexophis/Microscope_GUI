@@ -291,7 +291,7 @@ class ConWidget(QtWidgets.QWidget):
     def _create_acquisition_widgets(self):
         layout_acquisition = QtWidgets.QGridLayout()
 
-        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Dot Scan 2D"])
+        self.QComboBox_acquisition_modes = cw.ComboBoxWidget(list_items=["Wide Field 2D", "Dot Scan 2D", "Line Scan 2D"])
         self.QSpinBox_acquisition_number = cw.SpinBoxWidget(1, 50000, 1, 1)
         self.QPushButton_acquire = cw.PushButtonWidget('Acquire')
         self.QPushButton_save_acquisition_timing_presets = cw.PushButtonWidget("Save AcqTTLs")
