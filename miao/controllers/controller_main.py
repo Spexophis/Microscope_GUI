@@ -34,6 +34,7 @@ class MainController(QtCore.QObject):
         self._initial_setup()
         self.lasers = []
         self.cameras = {"imaging": 0, "wfs": 1}
+        self.acq_num = 1
         # dedicated thread pool for tasks
         self.task_worker = None
         self.task_thread = None
@@ -89,7 +90,7 @@ class MainController(QtCore.QObject):
         self.sazf.connect(self.save_zernike_coeffs)
         self.sig_plt.connect(self.plot_)
         # Galvo Scanners
-        self.v.con_view.Signal_galvo_set.connect(self.set_galvo)
+        # self.v.con_view.Signal_galvo_set.connect(self.set_galvo)
         self.v.con_view.Signal_galvo_scan_update.connect(self.update_galvo_scanner)
         # Cobolt Lasers
         self.v.con_view.Signal_set_laser.connect(self.set_laser)
@@ -488,6 +489,20 @@ class MainController(QtCore.QObject):
         pixel_size = self.pixel_sizes[self.cameras["imaging"]]
         tf.imwrite(str(fd + r".tif"), data=d, metadata={"pixel_size": (pixel_size, pixel_size)})
         with pd.ExcelWriter(str(fd + r"_metadata.xlsx"), engine="openpyxl") as writer:
+            if len(idx):
+                df_idx = pd.DataFrame(idx, columns=["acquisition_sequence"])
+                df_idx.to_excel(writer, sheet_name="acquisition_sequence", index=False)
+
+    @QtCore.pyqtSlot(str, np.ndarray, list)
+    def save_data_stack(self, tm: str, d: np.ndarray, idx: list):
+        fn = self.v.get_file_dialog()
+        if fn is not None:
+            fd = os.path.join(self.data_folder, tm + '_' + fn)
+        else:
+            fd = os.path.join(self.data_folder, tm)
+        pixel_size = self.pixel_sizes[self.cameras["imaging"]]
+        tf.imwrite(str(fd + r".tif"), data=d, metadata={"pixel_size": (pixel_size, pixel_size)})
+        with pd.ExcelWriter(str(fd + r"_metadata.xlsx"), engine="openpyxl") as writer:
             if idx is not None:
                 df_idx = pd.DataFrame(idx, columns=["acquisition_sequence"])
                 df_idx.to_excel(writer, sheet_name="acquisition_sequence", index=False)
@@ -507,25 +522,29 @@ class MainController(QtCore.QObject):
         #                              digital_sequences=dtr, digital_channels=dch, infinity=False)
 
     def widefield(self):
-        try:
-            self.prepare_widefield()
-        except Exception as e:
-            self.logg.error(f"Error preparing widefield zstack: {e}")
-            return
-        try:
-            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-            time.sleep(0.02)
-            self.m.nucleo.run_triggers()
-            time.sleep(0.3)
-            self.dm_cmd_ind = self.m.dm.current_cmd
-            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield',
-                           self.m.cam_set[self.cameras["imaging"]].get_data(),
-                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
-        except Exception as e:
+        data = []
+        for n in range(self.acq_num):
+            self.v.dialog_text.setText(f"Acquisition # {n+1}")
+            self.v.refresh_gui()
+            try:
+                self.prepare_widefield()
+            except Exception as e:
+                self.logg.error(f"Error preparing widefield zstack: {e}")
+                return
+            try:
+                self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+                time.sleep(0.02)
+                self.m.nucleo.run_triggers()
+                time.sleep(0.3)
+                self.dm_cmd_ind = self.m.dm.current_cmd
+                data.append(self.m.cam_set[self.cameras["imaging"]].get_data())
+                l = list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)
+            except Exception as e:
+                self.finish_widefield()
+                self.logg.error(f"Error running widefield zstack: {e}")
+                return
             self.finish_widefield()
-            self.logg.error(f"Error running widefield zstack: {e}")
-            return
-        self.finish_widefield()
+        self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield', np.array(data), l)
 
     def finish_widefield(self):
         try:
@@ -538,7 +557,8 @@ class MainController(QtCore.QObject):
 
     def run_widefield(self, n: int):
         self.v.get_dialog()
-        self.run_task(task=self.widefield, iteration=n)
+        self.acq_num = n
+        self.run_task(task=self.widefield)
 
     def prepare_dot_scan(self):
         # self.lasers = self.con_controller.get_lasers()
@@ -672,11 +692,11 @@ class MainController(QtCore.QObject):
             md = self.ao_controller.get_wfs_method()
             indz, amp = self.ao_controller.get_zernike_mode()
             if factory:
-                self.dfm.set_dm(
-                    self.dfm.cmd_add([i * amp for i in self.dfm.z2c[indz]], self.dfm.dm_cmd[self.dfm.current_cmd]))
+                self.dfm.temp_cmd.append(self.dfm.cmd_add([i * amp for i in self.dfm.z2c[indz]], self.dfm.dm_cmd[self.dfm.current_cmd]))
+                self.dfm.set_dm(self.dfm.temp_cmd[-1])
             else:
-                self.dfm.set_dm(
-                    self.dfm.cmd_add(self.dfm.get_zernike_cmd(indz, amp, md), self.dfm.dm_cmd[self.dfm.current_cmd]))
+                self.dfm.temp_cmd.append(self.dfm.cmd_add(self.dfm.get_zernike_cmd(indz, amp, md), self.dfm.dm_cmd[self.dfm.current_cmd]))
+                self.dfm.set_dm(self.dfm.temp_cmd[-1])
         except Exception as e:
             self.logg.error(f"DM Error: {e}")
 
