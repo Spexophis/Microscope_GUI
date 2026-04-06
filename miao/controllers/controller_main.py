@@ -1052,7 +1052,7 @@ class MainController(QtCore.QObject):
         try:
             lpr, hpr, slf, mf, err = self.ao_controller.get_ao_parameters()
             if mf == 'Mask(Intensity)':
-                msk = self.view_controller.get_image_data(7)
+                msk = self.view_controller.get_image_data(5)
             name = time.strftime("%Y%m%d_%H%M%S_") + self.dfm.dm_serial + '_ao_iterations_' + mf
             new_folder = os.path.join(self.data_folder, name)
             os.makedirs(new_folder, exist_ok=True)

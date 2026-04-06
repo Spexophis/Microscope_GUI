@@ -204,7 +204,7 @@ class ConWidget(QtWidgets.QWidget):
         layout_illumination = QtWidgets.QHBoxLayout()
 
         self.QRadioButton_laser_405 = cw.RadioButtonWidget('405 nm')
-        self.QDoubleSpinBox_laserpower_405 = cw.DoubleSpinBoxWidget(0, 200, 0.1, 1, 0.0)
+        self.QDoubleSpinBox_laserpower_405 = cw.DoubleSpinBoxWidget(0, 250, 0.1, 1, 0.0)
         self.QPushButton_laser_405 = cw.PushButtonWidget('ON', checkable=True)
         self.QRadioButton_laser_488 = cw.RadioButtonWidget('488 nm')
         self.QDoubleSpinBox_laserpower_488 = cw.DoubleSpinBoxWidget(0, 200, 0.1, 1, 0.0)

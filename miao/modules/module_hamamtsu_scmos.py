@@ -2315,37 +2315,41 @@ class HamamatsuCamera:
             self.logg.error("Failed to close DCAM API")
 
     def set_roi(self, h_bin, v_bin, h_start, h_size, v_start, v_size):
-        re = self.dcam.prop_setgetvalue(self.properties['SUBARRAY HPOS'], h_start)
-        if re is not False:
-            self.start_h = re
-            self.logg.info(f"Set ROI Horizontal Start: {re}")
+        re = self.dcam.prop_setvalue(self.properties['SUBARRAY MODE'], 2)
+        if re:
+            self.logg.info(f"SUBARRAY MODE ON: {re}")
         else:
-            self.logg.error(f"Failed to Set ROI Horizontal Start: {h_start}")
-        re = self.dcam.prop_setgetvalue(self.properties['SUBARRAY HSIZE'], h_size)
+            self.logg.error(f"Failed to SUBARRAY MODE: {re}")
+        re = self.dcam.prop_setvalue(self.properties['BINNING'], h_bin)
+        if re:
+            self.bin_h, self.bin_v = h_bin, h_bin
+            self.logg.info(f"Set Binning: {re}")
+        else:
+            self.logg.error(f"Failed to Set Binning: {h_bin}")
+        re = self.dcam.prop_setvalue(self.properties['SUBARRAY HSIZE'], h_size)
         if re is not False:
             self.pixels_x = re
             self.logg.info(f"Set ROI Horizontal Size: {re}")
         else:
             self.logg.error(f"Failed to Set ROI Horizontal Size: {h_size}")
-        re = self.dcam.prop_setgetvalue(self.properties['SUBARRAY VPOS'], v_start)
-        if re is not False:
-            self.start_v = re
-            self.logg.info(f"Set ROI Vertical Start: {re}")
-        else:
-            self.logg.error(f"Failed to Set ROI Vertical Start: {v_start}")
-        re = self.dcam.prop_setgetvalue(self.properties['SUBARRAY VSIZE'], v_size)
+        re = self.dcam.prop_setvalue(self.properties['SUBARRAY VSIZE'], v_size)
         if re is not False:
             self.pixels_y = re
             self.logg.info(f"Set ROI Vertical Size: {re}")
         else:
             self.logg.error(f"Failed to Set ROI Vertical Size: {v_size}")
-        binn = self.dcam.prop_setgetvalue(self.properties['BINNING'], h_bin)
+        re = self.dcam.prop_setvalue(self.properties['SUBARRAY HPOS'], h_start)
         if re is not False:
-            self.bin_h, self.bin_v = binn, binn
-            self.logg.info(f"Set Binning: {re}")
+            self.start_h = re
+            self.logg.info(f"Set ROI Horizontal Start: {re}")
         else:
-            self.logg.error(f"Failed to Set Binning: {h_bin}")
-            self.bin_h, self.bin_v = 1, 1
+            self.logg.error(f"Failed to Set ROI Horizontal Start: {h_start}")
+        re = self.dcam.prop_setvalue(self.properties['SUBARRAY VPOS'], v_start)
+        if re is not False:
+            self.start_v = re
+            self.logg.info(f"Set ROI Vertical Start: {re}")
+        else:
+            self.logg.error(f"Failed to Set ROI Vertical Start: {v_start}")
         self.img_size = self.pixels_x * self.pixels_y
 
     def set_exposure(self):
