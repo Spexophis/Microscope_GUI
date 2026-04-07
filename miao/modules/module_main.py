@@ -3,6 +3,7 @@ from miao.modules import module_tis
 from miao.modules import module_coboltlaser
 from miao.modules import module_deformablemirror
 from miao.modules import module_nucleo
+from miao.modules import module_piezo
 
 class MainModule:
 
@@ -35,6 +36,10 @@ class MainModule:
             self.nucleo = module_nucleo.NucleoBoards(logg=self.logg.error_log)
         except Exception as e:
             self.logg.error_log.error(f"{e}")
+        try:
+            self.pz = module_piezo.KinesisPiezo(logg=self.logg.error_log, config=self.config)
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
         self.logg.error_log.info("Finish initiating devices")
 
     def close(self):
@@ -49,5 +54,9 @@ class MainModule:
             self.logg.error_log.error(f"{e}")
         try:
             self.dm.close()
+        except Exception as e:
+            self.logg.error_log.error(f"{e}")
+        try:
+            self.pz.close()
         except Exception as e:
             self.logg.error_log.error(f"{e}")

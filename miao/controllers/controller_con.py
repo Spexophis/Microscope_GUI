@@ -19,6 +19,20 @@ class ConController:
                 self.v.QSpinBox_webcam_coordinate_nx.value(), self.v.QSpinBox_webcam_coordinate_ny.value(),
                 self.v.QSpinBox_webcam_coordinate_bin.value()]
 
+    def get_piezo_positions(self):
+        return [[self.v.QDoubleSpinBox_stage_x_usb.value(), self.v.QDoubleSpinBox_stage_x.value()],
+                [self.v.QDoubleSpinBox_stage_y_usb.value(), self.v.QDoubleSpinBox_stage_y.value()],
+                [self.v.QDoubleSpinBox_stage_z_usb.value(), self.v.QDoubleSpinBox_stage_z.value()]]
+
+    def display_piezo_position_x(self, ps):
+        self.v.QLCDNumber_piezo_position_x.display(ps)
+
+    def display_piezo_position_y(self, ps):
+        self.v.QLCDNumber_piezo_position_y.display(ps)
+
+    def display_piezo_position_z(self, ps):
+        self.v.QLCDNumber_piezo_position_z.display(ps)
+
     def get_galvo_positions(self):
         return [self.v.QDoubleSpinBox_galvo_x.value(), self.v.QDoubleSpinBox_galvo_y.value()]
 

@@ -9,6 +9,8 @@ from miao.utilities import customized_widgets as cw
 
 
 class ConWidget(QtWidgets.QWidget):
+    Signal_piezo_move_usb = QtCore.pyqtSignal(str, float)
+    Signal_piezo_move = QtCore.pyqtSignal(str, float)
     Signal_galvo_set = QtCore.pyqtSignal(float, float)
     Signal_galvo_scan_update = QtCore.pyqtSignal()
     Signal_set_laser = QtCore.pyqtSignal(list, bool, float)
@@ -117,6 +119,62 @@ class ConWidget(QtWidgets.QWidget):
     def _create_position_widgets(self):
         layout_position = QtWidgets.QHBoxLayout()
 
+        self.QDoubleSpinBox_stage_x_usb = cw.DoubleSpinBoxWidget(0, 20, 0.020, 3, 10.000)
+        self.QLCDNumber_piezo_position_x = cw.LCDNumberWidget()
+        self.QDoubleSpinBox_stage_x = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 0.000)
+        self.QDoubleSpinBox_step_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.030)
+        self.QDoubleSpinBox_range_x = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.780)
+        self.QDoubleSpinBox_stage_y_usb = cw.DoubleSpinBoxWidget(0, 20, 0.020, 3, 10.000)
+        self.QLCDNumber_piezo_position_y = cw.LCDNumberWidget()
+        self.QDoubleSpinBox_stage_y = cw.DoubleSpinBoxWidget(0, 100, 0.020, 3, 0.000)
+        self.QDoubleSpinBox_step_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.030)
+        self.QDoubleSpinBox_range_y = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.780)
+        self.QDoubleSpinBox_stage_z_usb = cw.DoubleSpinBoxWidget(0, 20, 0.04, 2, 10.00)
+        self.QLCDNumber_piezo_position_z = cw.LCDNumberWidget()
+        self.QDoubleSpinBox_stage_z = cw.DoubleSpinBoxWidget(0, 20, 0.04, 2, 0.00)
+        self.QDoubleSpinBox_step_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 0.160)
+        self.QDoubleSpinBox_range_z = cw.DoubleSpinBoxWidget(0, 50, 0.001, 4, 4.80)
+        self.QDoubleSpinBox_piezo_return_time = cw.DoubleSpinBoxWidget(0, 50, 0.01, 2, 0.04)
+        self.QPushButton_focus_finding = cw.PushButtonWidget('Find Focus')
+
+        self.piezo_scroll_area, piezo_scroll_layout = cw.create_scroll_area("Grid")
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Thorlabs Piezo')), 0, 0)
+        piezo_scroll_layout.addWidget(cw.FrameWidget(), 1, 0, 1, 3)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('X (um)')), 2, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_x_usb, 2, 1)
+        piezo_scroll_layout.addWidget(self.QLCDNumber_piezo_position_x, 2, 2)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Origin / um')), 3, 0)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Step / um')), 3, 1)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Range / um')), 3, 2)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_x, 4, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_step_x, 4, 1)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_range_x, 4, 2)
+        piezo_scroll_layout.addWidget(cw.FrameWidget(), 5, 0, 1, 3)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Y (um)')), 6, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_y_usb, 6, 1)
+        piezo_scroll_layout.addWidget(self.QLCDNumber_piezo_position_y, 6, 2)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Origin / um')), 7, 0)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Step / um')), 7, 1)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Range / um')), 7, 2)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_y, 8, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_step_y, 8, 1)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_range_y, 8, 2)
+        piezo_scroll_layout.addWidget(cw.FrameWidget(), 9, 0, 1, 3)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Z (um)')), 10, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_z_usb, 10, 1)
+        piezo_scroll_layout.addWidget(self.QLCDNumber_piezo_position_z, 10, 2)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Origin / um')), 11, 0)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Step / um')), 11, 1)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Range / um')), 11, 2)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_stage_z, 12, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_step_z, 12, 1)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_range_z, 12, 2)
+        piezo_scroll_layout.addWidget(cw.FrameWidget(), 13, 0, 1, 3)
+        piezo_scroll_layout.addWidget(cw.LabelWidget(str('Piezo Return / s')), 14, 0)
+        piezo_scroll_layout.addWidget(self.QDoubleSpinBox_piezo_return_time, 14, 1)
+        piezo_scroll_layout.addWidget(cw.FrameWidget(), 15, 0, 1, 3)
+        piezo_scroll_layout.addWidget(self.QPushButton_focus_finding, 16, 0)
+
         self.QLCDNumber_galvo_frequency = cw.LCDNumberWidget(0, 3)
         self.QDoubleSpinBox_galvo_x = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0)
         self.QDoubleSpinBox_galvo_y = cw.DoubleSpinBoxWidget(-10, 10, 0.0001, 5, 0)
@@ -197,6 +255,7 @@ class ConWidget(QtWidgets.QWidget):
         galvo_scroll_layout.addWidget(self.QLineEdit_new_galvo_scan_preset, 16, 0)
         galvo_scroll_layout.addWidget(self.QPushButton_save_new_galvo_scan_preset, 16, 1)
 
+        layout_position.addWidget(self.piezo_scroll_area)
         layout_position.addWidget(self.galvo_scroll_area)
         return layout_position
 
@@ -306,6 +365,12 @@ class ConWidget(QtWidgets.QWidget):
         return layout_acquisition
 
     def _set_signal_connections(self):
+        self.QDoubleSpinBox_stage_x.valueChanged.connect(self.set_piezo_x)
+        self.QDoubleSpinBox_stage_y.valueChanged.connect(self.set_piezo_y)
+        self.QDoubleSpinBox_stage_z.valueChanged.connect(self.set_piezo_z)
+        self.QDoubleSpinBox_stage_x_usb.valueChanged.connect(self.set_piezo_x_usb)
+        self.QDoubleSpinBox_stage_y_usb.valueChanged.connect(self.set_piezo_y_usb)
+        self.QDoubleSpinBox_stage_z_usb.valueChanged.connect(self.set_piezo_z_usb)
         self.QDoubleSpinBox_galvo_x.valueChanged.connect(self.set_galvo_x)
         self.QDoubleSpinBox_galvo_y.valueChanged.connect(self.set_galvo_y)
         self.QSpinBox_dot_step_x.valueChanged.connect(self.update_galvo_scan)
@@ -331,6 +396,30 @@ class ConWidget(QtWidgets.QWidget):
         self.QComboBox_acquisition_modes.currentIndexChanged[str].connect(self.load_selected_digital_timing_presets)
         self.QPushButton_save_live_timing_presets.clicked.connect(lambda: self.save_digital_timing_preset("live"))
         self.QPushButton_save_acquisition_timing_presets.clicked.connect(lambda: self.save_digital_timing_preset("acquisition"))
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_x(self, pos_x: float):
+        self.Signal_piezo_move.emit("x", pos_x)
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_y(self, pos_y: float):
+        self.Signal_piezo_move.emit("y", pos_y)
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_z(self, pos_z: float):
+        self.Signal_piezo_move.emit("z", pos_z)
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_x_usb(self, pos_x: float):
+        self.Signal_piezo_move_usb.emit("x", pos_x)
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_y_usb(self, pos_y: float):
+        self.Signal_piezo_move_usb.emit("y", pos_y)
+
+    @QtCore.pyqtSlot(float)
+    def set_piezo_z_usb(self, pos_z: float):
+        self.Signal_piezo_move_usb.emit("z", pos_z)
 
     @QtCore.pyqtSlot(float)
     def set_galvo_x(self, value: float):

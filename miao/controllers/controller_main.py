@@ -89,6 +89,10 @@ class MainController(QtCore.QObject):
         self.sada.connect(self.save_data)
         self.sazf.connect(self.save_zernike_coeffs)
         self.sig_plt.connect(self.plot_)
+        # Piezo
+        self.v.con_view.Signal_piezo_move_usb.connect(self.set_piezo_positions_usb)
+        self.v.con_view.Signal_piezo_move.connect(self.set_piezo_positions)
+        # self.v.con_view.Signal_focus_finding.connect(self.run_focus_finding)
         # Galvo Scanners
         # self.v.con_view.Signal_galvo_set.connect(self.set_galvo)
         self.v.con_view.Signal_galvo_scan_update.connect(self.update_galvo_scanner)
@@ -134,6 +138,8 @@ class MainController(QtCore.QObject):
 
             self.loop_flag = True
 
+            self.reset_piezo_positions()
+
             self.reset_galvo_positions()
             self.update_galvo_scanner()
 
@@ -171,6 +177,79 @@ class MainController(QtCore.QObject):
     @QtCore.pyqtSlot()
     def interrupt_thread(self):
         self.loop_flag = False
+
+    def reset_piezo_positions(self):
+        pos_x, pos_y, pos_z = self.con_controller.get_piezo_positions()
+        self.set_piezo_position_x(pos_x[0], port="software")
+        time.sleep(0.05)
+        self.set_piezo_position_y(pos_y[0], port="software")
+        time.sleep(0.05)
+        self.set_piezo_position_z(pos_z[0], port="software")
+        time.sleep(0.05)
+        self.set_piezo_position_x(pos_x[1], port="analog")
+        self.set_piezo_position_y(pos_y[1], port="analog")
+        self.set_piezo_position_z(pos_z[1], port="analog")
+        time.sleep(0.1)
+        self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
+        self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
+        self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
+
+    @QtCore.pyqtSlot(str, float)
+    def set_piezo_positions_usb(self, axis: str, value: float):
+        if axis == "x":
+            self.set_piezo_position_x(value, port="software")
+        if axis == "y":
+            self.set_piezo_position_y(value, port="software")
+        if axis == "z":
+            self.set_piezo_position_z(value, port="software")
+
+    @QtCore.pyqtSlot(str, float)
+    def set_piezo_positions(self, axis: str, value: float):
+        if axis == "x":
+            self.set_piezo_position_x(value, port="analog")
+        if axis == "y":
+            self.set_piezo_position_y(value, port="analog")
+        if axis == "z":
+            self.set_piezo_position_z(value, port="analog")
+
+    def set_piezo_position_x(self, pos_x, port="analog"):
+        try:
+            if port == "software":
+                self.m.pz.move_position(0, pos_x)
+                time.sleep(0.1)
+                self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
+            # else:
+            #     self.m.daq.set_piezo_position([pos_x / 10.], [0])
+            #     time.sleep(0.1)
+            #     self.con_controller.display_piezo_position_x(self.m.pz.read_position(0))
+        except Exception as e:
+            self.logg.error(f"MCL Piezo Error: {e}")
+
+    def set_piezo_position_y(self, pos_y, port="analog"):
+        try:
+            if port == "software":
+                self.m.pz.move_position(1, pos_y)
+                time.sleep(0.1)
+                self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
+            # else:
+            #     self.m.daq.set_piezo_position([pos_y / 10.], [1])
+            #     time.sleep(0.1)
+            #     self.con_controller.display_piezo_position_y(self.m.pz.read_position(1))
+        except Exception as e:
+            self.logg.error(f"MCL Piezo Error: {e}")
+
+    def set_piezo_position_z(self, pos_z, port="analog"):
+        try:
+            if port == "software":
+                self.m.pz.move_position(2, pos_z)
+                time.sleep(0.1)
+                self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
+            # else:
+            #     self.m.daq.set_piezo_position([pos_z / 10.], [2])
+            #     time.sleep(0.1)
+            #     self.con_controller.display_piezo_position_z(self.m.pz.read_position(2))
+        except Exception as e:
+            self.logg.error(f"MCL Piezo Error: {e}")
 
     def reset_galvo_positions(self):
         g_x, g_y = self.con_controller.get_galvo_positions()
