@@ -6,6 +6,7 @@ class TriggerSequence:
         def __init__(self, sample_rate=2.5e5):
             # daq
             self.sample_rate = sample_rate  # Hz
+            self.camera_rate = 30
             # digital triggers
             self.digital_starts = [0.000000, 0.010100, 0.010140, 0.010100]
             self.digital_ends = [0.010000, 0.010104, 0.010640, 0.011100]
@@ -18,7 +19,7 @@ class TriggerSequence:
             self.ramp_down_offset = 50  # samples
             # galvo scan for read out
             self.galvo_origins = [1.0, 1.465]  # V
-            self.galvo_ranges = [4.0, 4]  # V
+            self.galvo_ranges = [0.4, 0.4]  # V
             self.galvo_offsets = [0.000, 0.000]  # V
             self.galvo_starts = [o_ - r_ / 2 for (o_, r_) in zip(self.galvo_origins, self.galvo_ranges)]
             self.dot_ranges = [2.0, 0.45]  # V
@@ -29,6 +30,7 @@ class TriggerSequence:
             self.dot_step_y = 0.03  # volts
             self.up_rate = self.dot_step_v / self.dot_step_s
             self.dot_pos = np.arange(self.dot_starts[0], self.galvo_stops[0], self.dot_step_v)
+
             # sawtooth wave for read out
             self.ramp_up = np.arange(self.galvo_starts[0], self.galvo_stops[0] + self.dot_step_v, self.up_rate)
             self.ramp_up_samples = self.ramp_up.size
@@ -331,23 +333,36 @@ class TriggerSequence:
             galvo_sequences[i] = np.round(galvo_sequences[i] * 4096 / 3.3).astype(np.uint16)
         return np.asarray(digital_sequences), np.asarray(galvo_sequences), lasers
 
-    def generate_line_scanning_triggers(self, lasers, camera):
-        digital_trigger, digital_channels, galvo_steps, galvo_channels = self.generate_digital_triggers(lasers, camera)
-        x_pos = np.arange(self.dot_starts[0], self.galvo_stops[0] + 0.0001, self.dot_step_v)
-        y_pos = np.arange(self.dot_starts[1], self.galvo_stops[1], self.dot_step_y)
-        step_length = digital_trigger.shape[1]
-        if self.galvo_step_response > self.standby_samples:
-            offset = self.galvo_step_response - self.standby_samples
-        galvo_start = self.digital_ends[-1] + int(32e-6 * self.sample_rate)
-        pos = x_pos.shape[0] * y_pos.shape[0]
-        digital_triggers = np.tile(digital_trigger, (1, pos))
-        galvo_sequences = np.ones((len(galvo_channels), digital_triggers.shape[1]), dtype=np.float16)
-        galvo_sequences[0] = np.repeat(x_pos, step_length)
-        galvo_sequences[1] = np.repeat(y_pos, step_length)
-        shifts = step_length - galvo_start
-        galvo_sequences[0] = shift_array(galvo_sequences[0], shifts, fill=None, direction='backward')
-        galvo_sequences[1] = shift_array(galvo_sequences[1], shifts, fill=None, direction='backward')
-        return digital_triggers, digital_channels, galvo_sequences, galvo_channels, pos
+    def generate_galvo_scanning_triggers(self, lasers, camera):
+        cam_ind = camera + 2
+        digital_channels = lasers.copy()
+        digital_channels.append(cam_ind)
+        dt = 1 / self.sample_rate  # s
+        band_width = 125  # Hz = 8ms
+        triangle_period_min = 1 / band_width
+        triangle_exposure_samples = int(2e-3 / dt)
+        triangle_period_sample = int(triangle_period_min / dt)
+        galvo_delay = 200
+        hals_galvo_sequence = int(triangle_period_sample/2)
+        final_length = int((1 / self.camera_rate) / dt)
+        y = np.ones(hals_galvo_sequence + int(galvo_delay/2)) * self.galvo_stops[1]
+        y[:hals_galvo_sequence] = np.linspace(self.galvo_starts[1], self.galvo_stops[1], hals_galvo_sequence)
+        yf = np.flip(y)
+        yn = np.hstack((y, yf))
+        yf= np.pad(yn, (0, final_length - len(yn)), mode='constant', constant_values=self.galvo_starts[1])
+        x = np.ones(final_length)*self.galvo_origins[0] #galvo for x axis
+        gtr = np.vstack((x, yf))
+        galvo_channels = [0, 1]
+        galvo_sequences = (gtr * 4096 / 3.3).astype(int)
+        start_405 = 250
+        end_405 = start_405 + triangle_exposure_samples
+        start_488 = hals_galvo_sequence + galvo_delay + 125 + (hals_galvo_sequence-end_405)
+        end_488 = int(start_488 + triangle_exposure_samples)
+        digital_trigger = np.zeros((3, final_length))
+        digital_trigger[0, start_405:end_405] = 1
+        digital_trigger[1, start_488:end_488] = 1
+        digital_trigger[2, start_488:end_488] = 1
+        return digital_trigger, digital_channels, galvo_sequences, galvo_channels
 
 
 def convert_list(arrays):

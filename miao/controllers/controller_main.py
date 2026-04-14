@@ -281,20 +281,21 @@ class MainController(QtCore.QObject):
 
     def set_lasers(self, lasers):
         pws = self.con_controller.get_cobolt_laser_power("all")
-        ln = []
-        pw = []
-        for ls in lasers:
-            ln.append(self.laser_lists[ls])
-            pw.append(pws[ls])
+        # ln = []
+        # pw = []
+        # for ls in lasers:
+        #     ln.append(self.laser_lists[ls])
+        #     pw.append(pws[ls])
         try:
-            self.m.laser.set_modulation_mode(ln, pw)
-            self.m.laser.laser_on(ln)
+            self.m.laser.set_modulation_mode(["405", "488"], pws)
+            self.m.laser.laser_on("all")
         except Exception as e:
             self.logg.error(f"Cobolt Laser Error: {e}")
 
     def lasers_off(self):
         try:
             self.m.laser.laser_off("all")
+            self.logg.info(f"Cobolt Laser Off")
         except Exception as e:
             self.logg.error(f"Cobolt Laser Error: {e}")
 
@@ -339,9 +340,12 @@ class MainController(QtCore.QObject):
         elif vd_mod == "Dot Scan":
             dtr, gtr, chs = self.p.trigger.generate_dot_scanning_triggers(self.lasers, self.cameras["imaging"])
             self.m.nucleo.t = dtr.shape[1] / self.m.nucleo.sample_rate
-            print(self.m.nucleo.t)
             self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
                                          digital_sequences=dtr, digital_channels=chs, infinity=True)
+        elif vd_mod == "Galvo Scan":
+            dtr, dchs, gtr, gchs = self.p.trigger.generate_galvo_scanning_triggers(self.lasers, self.cameras["imaging"])
+            self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4],
+                                         digital_sequences=dtr, digital_channels=[0, 1, 2], infinity=True)
         else:
             raise ValueError("Invalid video mode")
 
@@ -406,7 +410,6 @@ class MainController(QtCore.QObject):
         return self.p.trigger.generate_digital_triggers(self.lasers, self.cameras[cam_key])
 
     def prepare_video(self):
-        self.lasers = [0, 1]
         self.set_lasers(self.lasers)
         self.set_camera_roi("imaging")
         t = self.con_controller.get_thorcam_expo()
@@ -690,7 +693,7 @@ class MainController(QtCore.QObject):
     def prepare_line_scan(self):
         dot_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.p.trigger.galvo_origins, self.p.trigger.dot_ranges)]
         x_pos = np.arange(self.p.trigger.dot_starts[0], dot_stops[0] + 0.0001, self.p.trigger.dot_step_v)
-        y_pos = np.arange(self.p.trigger.dot_starts[1], dot_stops[1], self.p.trigger.dot_step_y)
+        y_pos = np.arange(self.p.trigger.dot_starts[1], dot_stops[1] + 0.0001, self.p.trigger.dot_step_y)
         pos = x_pos.shape[0] * y_pos.shape[0]
         gtrs = []
         for xp in x_pos:
@@ -699,18 +702,11 @@ class MainController(QtCore.QObject):
                 gtr[0] *= int(xp * 4096 / 3.3)
                 gtr[1] *= int(yp * 4096 / 3.3)
                 gtrs.append(gtr)
-        # print(self.p.trigger.galvo_origins)
-        # print(self.p.trigger.dot_ranges)
-        # print(self.p.trigger.dot_starts)
-        # print(self.p.trigger.dot_step_v, self.p.trigger.dot_step_y)
-        # print(pos)
-        # print(x_pos)
-        # print(y_pos)
         # self.lasers = self.con_controller.get_lasers()
         self.set_lasers(self.lasers)
         # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+        self.m.cam_set[self.cameras["imaging"]].acq_num = pos + 10
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         # self.update_trigger_parameters("imaging")
         # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
@@ -728,8 +724,25 @@ class MainController(QtCore.QObject):
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            self.lasers_off()
+            for _ in range(5):
+                self.m.nucleo.run_triggers()
+                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            try:
+
+                self.m.laser.laser_on(["488"])
+                self.logg.info(f"Cobolt Laser 488 ON")
+            except Exception as e:
+                self.logg.error(f"Cobolt Laser Error: {e}")
+            for _ in range(5):
+                self.m.nucleo.run_triggers()
+                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            try:
+                self.m.laser.laser_on(["405"])
+                self.logg.info(f"Cobolt Laser 405 ON")
+            except Exception as e:
+                self.logg.error(f"Cobolt Laser Error: {e}")
             for gtr in gtrs:
-                # print(gtr[:, 0])
                 self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
                 time.sleep(0.02)
                 self.m.nucleo.run_triggers()

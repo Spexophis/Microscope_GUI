@@ -327,7 +327,7 @@ class ConWidget(QtWidgets.QWidget):
         layout_video = QtWidgets.QGridLayout()
 
         self.QComboBox_imaging_camera_selection = cw.ComboBoxWidget(list_items=["Thorlabs", "WebCam"])
-        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Dot Scan"])
+        self.QComboBox_live_modes = cw.ComboBoxWidget(list_items=["Wide Field", "Dot Scan", "Galvo Scan"])
         self.QPushButton_video = cw.PushButtonWidget("Video", checkable=True)
         self.QPushButton_fft = cw.PushButtonWidget("FFT", checkable=True, enable=False)
         self.QComboBox_profile_axis = cw.ComboBoxWidget(list_items=["X", "Y"])
