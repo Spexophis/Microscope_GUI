@@ -594,7 +594,7 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].acq_num = 1
+        self.m.cam_set[self.cameras["imaging"]].acq_num = (self.acq_num*2) + 3
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         # self.update_trigger_parameters("imaging")
         # dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
@@ -605,28 +605,125 @@ class MainController(QtCore.QObject):
 
     def widefield(self):
         data = []
-        for n in range(self.acq_num):
-            self.v.dialog_text.setText(f"Acquisition # {n+1}")
-            self.v.refresh_gui()
-            try:
-                self.prepare_widefield()
-            except Exception as e:
-                self.logg.error(f"Error preparing widefield zstack: {e}")
-                return
-            try:
-                self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
-                time.sleep(0.02)
+        try:
+            self.prepare_widefield()
+        except Exception as e:
+            self.logg.error(f"Error preparing widefield zstack: {e}")
+            return
+        try:
+            self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+            self.lasers_off()
+            for _ in range(3):
                 self.m.nucleo.run_triggers()
-                time.sleep(0.3)
-                self.dm_cmd_ind = self.m.dm.current_cmd
-                data.append(self.m.cam_set[self.cameras["imaging"]].get_data())
-                l = list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)
+                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            try:
+                self.m.laser.laser_on(["488"])
+                self.logg.info(f"Cobolt Laser 488 ON")
             except Exception as e:
-                self.finish_widefield()
-                self.logg.error(f"Error running widefield zstack: {e}")
-                return
+                self.logg.error(f"Cobolt Laser Error: {e}")
+            for i in range((self.acq_num)*2):
+                if i%2 == 0 :
+                    try:
+                        self.m.laser.laser_off(["405"])
+                        self.logg.info(f"Cobolt Laser 405 OFF")
+                    except Exception as e:
+                        self.logg.error(f"Cobolt Laser Error: {e}")
+                    self.m.nucleo.run_triggers()
+                    time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+                else:
+                    try:
+                        self.m.laser.laser_on(["405"])
+                        self.logg.info(f"Cobolt Laser 405 ON")
+                    except Exception as e:
+                        self.logg.error(f"Cobolt Laser Error: {e}")
+                    self.m.nucleo.run_triggers()
+                    time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            self.dm_cmd_ind = self.m.dm.current_cmd
+            self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield',
+                           self.m.cam_set[self.cameras["imaging"]].get_data(),
+                           list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
+        except Exception as e:
             self.finish_widefield()
-        self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield', np.array(data), l)
+            self.logg.error(f"Error running widefield zstack: {e}")
+            return
+        self.finish_widefield()
+
+    #Old widefiel acquisition sequence
+    # def prepare_widefield(self):
+    #     # self.lasers = self.con_controller.get_lasers()
+    #     self.set_lasers(self.lasers)
+    #     # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+    #     self.set_camera_roi("imaging")
+    #     self.m.cam_set[self.cameras["imaging"]].acq_num = self.acq_num* + 10  + 3
+    #     self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+    #     # self.update_trigger_parameters("imaging")
+    #     # dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
+    #     # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+    #     # self.m.nucleo.set_piezo_position(pos=[ptr[0]], indices=[2])
+    #     # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=pch,
+    #     #                              digital_sequences=dtr, digital_channels=dch, infinity=False)
+    # def widefield(self):
+    #     data = []
+    #     for n in range(self.acq_num):
+    #         self.v.dialog_text.setText(f"Acquisition # {n+1}")
+    #         self.v.refresh_gui()
+    #         try:
+    #             self.prepare_widefield()
+    #         except Exception as e:
+    #             self.logg.error(f"Error preparing widefield zstack: {e}")
+    #             return
+    #         try:
+    #             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+    #             time.sleep(0.02)
+    #             self.m.nucleo.run_triggers()
+    #             time.sleep(0.3)
+    #             self.dm_cmd_ind = self.m.dm.current_cmd
+    #             data.append(self.m.cam_set[self.cameras["imaging"]].get_data())
+    #             l = list(self.m.cam_set[self.cameras["imaging"]].data.ind_list)
+    #         except Exception as e:
+    #             self.finish_widefield()
+    #             self.logg.error(f"Error running widefield zstack: {e}")
+    #             return
+    #         self.finish_widefield()
+    #     self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield', np.array(data), l)
+    # def widefield(self):
+    #     data = []
+    #     try:
+    #         self.prepare_widefield()
+    #     except Exception as e:
+    #         self.logg.error(f"Error preparing widefield zstack: {e}")
+    #         return
+    #     try:
+    #         self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+    #         self.lasers_off()
+    #         for _ in range(3):
+    #             self.m.nucleo.run_triggers()
+    #             time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         try:
+    #             self.m.laser.laser_on(["488"])
+    #             self.logg.info(f"Cobolt Laser 488 ON")
+    #         except Exception as e:
+    #             self.logg.error(f"Cobolt Laser Error: {e}")
+    #         for _ in range(10):
+    #             self.m.nucleo.run_triggers()
+    #             time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         try:
+    #             self.m.laser.laser_on(["405"])
+    #             self.logg.info(f"Cobolt Laser 405 ON")
+    #         except Exception as e:
+    #             self.logg.error(f"Cobolt Laser Error: {e}")
+    #         for _ in range(self.acq_num):
+    #             self.m.nucleo.run_triggers()
+    #             time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         self.dm_cmd_ind = self.m.dm.current_cmd
+    #         self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_widefield',
+    #                        self.m.cam_set[self.cameras["imaging"]].get_data(),
+    #                        list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
+    #     except Exception as e:
+    #         self.finish_widefield()
+    #         self.logg.error(f"Error running widefield zstack: {e}")
+    #         return
+    #     self.finish_widefield()
 
     def finish_widefield(self):
         try:
@@ -706,7 +803,8 @@ class MainController(QtCore.QObject):
         self.set_lasers(self.lasers)
         # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
         self.set_camera_roi("imaging")
-        self.m.cam_set[self.cameras["imaging"]].acq_num = pos + 10
+        # self.m.cam_set[self.cameras["imaging"]].acq_num = 21 * pos + 5
+        self.m.cam_set[self.cameras["imaging"]].acq_num = self.acq_num*2 * pos + 3 + 1
         self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
         # self.update_trigger_parameters("imaging")
         # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
@@ -719,34 +817,44 @@ class MainController(QtCore.QObject):
     def line_scan(self):
         try:
             gtrs = self.prepare_line_scan()
+            # dtr, dchs, _, _ = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
         except Exception as e:
             self.logg.error(f"Error preparing galvo line scanning: {e}")
             return
         try:
             self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
             self.lasers_off()
-            for _ in range(5):
+            for _ in range(3):
                 self.m.nucleo.run_triggers()
                 time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
             try:
-
                 self.m.laser.laser_on(["488"])
                 self.logg.info(f"Cobolt Laser 488 ON")
             except Exception as e:
                 self.logg.error(f"Cobolt Laser Error: {e}")
-            for _ in range(5):
-                self.m.nucleo.run_triggers()
-                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
-            try:
-                self.m.laser.laser_on(["405"])
-                self.logg.info(f"Cobolt Laser 405 ON")
-            except Exception as e:
-                self.logg.error(f"Cobolt Laser Error: {e}")
-            for gtr in gtrs:
-                self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
-                time.sleep(0.02)
-                self.m.nucleo.run_triggers()
-                time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+            for i in range(self.acq_num*2):
+                if i % 2 == 0:
+                    try:
+                        self.m.laser.laser_off(["405"])
+                        self.logg.info(f"Cobolt Laser 405 OFF")
+                    except Exception as e:
+                        self.logg.error(f"Cobolt Laser Error: {e}")
+                    for gtr in gtrs:
+                        self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
+                        time.sleep(0.02)
+                        self.m.nucleo.run_triggers()
+                        time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+                else:
+                    try:
+                        self.m.laser.laser_on(["405"])
+                        self.logg.info(f"Cobolt Laser 405 ON")
+                    except Exception as e:
+                        self.logg.error(f"Cobolt Laser Error: {e}")
+                    for gtr in gtrs:
+                        self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
+                        time.sleep(0.02)
+                        self.m.nucleo.run_triggers()
+                        time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
             self.dm_cmd_ind = self.m.dm.current_cmd
             self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_line_scanning',
                                    self.m.cam_set[self.cameras["imaging"]].get_data(),
@@ -756,6 +864,80 @@ class MainController(QtCore.QObject):
             self.logg.error(f"Error running line scanning: {e}")
             return
         self.finish_line_scan()
+
+
+    # #Old scan line acquisition sequence
+    # def prepare_line_scan(self):
+    #     dot_stops = [o_ + r_ / 2 for (o_, r_) in zip(self.p.trigger.galvo_origins, self.p.trigger.dot_ranges)]
+    #     x_pos = np.arange(self.p.trigger.dot_starts[0], dot_stops[0] + 0.0001, self.p.trigger.dot_step_v)
+    #     y_pos = np.arange(self.p.trigger.dot_starts[1], dot_stops[1] + 0.0001, self.p.trigger.dot_step_y)
+    #     pos = x_pos.shape[0] * y_pos.shape[0]
+    #     gtrs = []
+    #     for xp in x_pos:
+    #         for yp in y_pos:
+    #             gtr = np.ones((2, self.m.nucleo.sequence_length), dtype=np.uint16)
+    #             gtr[0] *= int(xp * 4096 / 3.3)
+    #             gtr[1] *= int(yp * 4096 / 3.3)
+    #             gtrs.append(gtr)
+    #     # self.lasers = self.con_controller.get_lasers()
+    #     self.set_lasers(self.lasers)
+    #     # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
+    #     self.set_camera_roi("imaging")
+    #     # self.m.cam_set[self.cameras["imaging"]].acq_num = 21 * pos + 5
+    #     self.m.cam_set[self.cameras["imaging"]].acq_num = 21 * pos + 3
+    #     self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
+    #     # self.update_trigger_parameters("imaging")
+    #     # gtr, ptr, dtr, chs, pos = self.p.trigger.generate_dotsacn_resolft_2d(self.lasers, self.cameras["imaging"])
+    #     # self.m.cam_set[self.cameras["imaging"]].acq_num = pos
+    #     # self.m.nucleo.write_triggers(piezo_sequences=ptr, piezo_channels=[0, 1],
+    #     #                           galvo_sequences=gtr, galvo_channels=[0, 1, 2],
+    #     #                           digital_sequences=dtr, digital_channels=chs)
+    #     return gtrs
+    # def line_scan(self):
+    #     try:
+    #         gtrs = self.prepare_line_scan()
+    #         # dtr, dchs, _, _ = self.p.trigger.generate_digital_triggers(self.lasers, self.cameras["imaging"])
+    #     except Exception as e:
+    #         self.logg.error(f"Error preparing galvo line scanning: {e}")
+    #         return
+    #     try:
+    #         self.m.cam_set[self.cameras["imaging"]].start_data_acquisition()
+    #         self.lasers_off()
+    #         for _ in range(5):
+    #             self.m.nucleo.run_triggers()
+    #             time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         try:
+    #             self.m.laser.laser_on(["488"])
+    #             self.logg.info(f"Cobolt Laser 488 ON")
+    #         except Exception as e:
+    #             self.logg.error(f"Cobolt Laser Error: {e}")
+    #         for _ in range(5):
+    #             for gtr in gtrs:
+    #                 self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
+    #                 time.sleep(0.02)
+    #                 self.m.nucleo.run_triggers()
+    #                 time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         try:
+    #             self.m.laser.laser_on(["405"])
+    #             self.logg.info(f"Cobolt Laser 405 ON")
+    #         except Exception as e:
+    #             self.logg.error(f"Cobolt Laser Error: {e}")
+    #         for _ in range(16):
+    #             for gtr in gtrs:
+    #                 self.m.nucleo.write_triggers(galvo_sequences=gtr, galvo_channels=[3, 4], infinity=False)
+    #                 time.sleep(0.02)
+    #                 self.m.nucleo.run_triggers()
+    #                 time.sleep(self.m.nucleo.sequence_length * 10 / 1e6)
+    #         self.dm_cmd_ind = self.m.dm.current_cmd
+    #         self.sada.emit(time.strftime("%Y%m%d%H%M%S") + '_line_scanning',
+    #                                self.m.cam_set[self.cameras["imaging"]].get_data(),
+    #                                list(self.m.cam_set[self.cameras["imaging"]].data.ind_list))
+    #     except Exception as e:
+    #         self.finish_line_scan()
+    #         self.logg.error(f"Error running line scanning: {e}")
+    #         return
+    #     self.finish_line_scan()
+
 
     def finish_line_scan(self):
         try:
@@ -768,7 +950,8 @@ class MainController(QtCore.QObject):
 
     def run_line_scan(self, n: int):
         self.v.get_dialog()
-        self.run_task(task=self.line_scan, iteration=n)
+        self.acq_num = n
+        self.run_task(task=self.line_scan)
 
     @QtCore.pyqtSlot(int, float)
     def push_actuator(self, n: int, a: float):
