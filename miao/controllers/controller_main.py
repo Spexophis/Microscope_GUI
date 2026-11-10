@@ -654,7 +654,7 @@ class MainController(QtCore.QObject):
     #     self.set_lasers(self.lasers)
     #     # self.cameras["imaging"] = self.con_controller.get_imaging_camera()
     #     self.set_camera_roi("imaging")
-    #     self.m.cam_set[self.cameras["imaging"]].acq_num = self.acq_num* + 10  + 3
+    #     self.m.cam_set[self.cameras["imaging"]].acq_num = self.acq_num + 10  + 3
     #     self.m.cam_set[self.cameras["imaging"]].prepare_data_acquisition()
     #     # self.update_trigger_parameters("imaging")
     #     # dtr, sw, ptr, dch, pch, pos = self.p.trigger.generate_piezo_scan(self.lasers, self.cameras["imaging"])
